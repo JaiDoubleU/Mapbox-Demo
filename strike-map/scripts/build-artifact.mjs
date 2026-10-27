@@ -9,6 +9,16 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "..");
+
+// Pre-fill the page's token setting from NEXT_PUBLIC_MAPBOX_TOKEN (environment or .env).
+function envToken() {
+  if (process.env.NEXT_PUBLIC_MAPBOX_TOKEN) return process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+  const file = path.join(root, ".env");
+  if (!fs.existsSync(file)) return "";
+  const m = fs.readFileSync(file, "utf8").match(/^NEXT_PUBLIC_MAPBOX_TOKEN=(.*)$/m);
+  return m ? m[1].trim().replace(/^["']|["']$/g, "") : "";
+}
+const mapboxToken = envToken();
 const out = path.resolve(process.argv[2] ?? path.join(root, "dist-artifact/index.html"));
 
 const js = await build({
@@ -55,7 +65,7 @@ const html = `<title>Enverus STRIKE Map</title>
      page always uses the canvas basemap, because the sandbox blocks Mapbox.
      ============================================================================= */
   window.STRIKE_CONFIG = {
-    mapboxToken: ""
+    mapboxToken: ${JSON.stringify(mapboxToken)}
   };
 </script>
 <style>${css}</style>
@@ -64,4 +74,5 @@ const html = `<title>Enverus STRIKE Map</title>
 `;
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, html);
+console.log(mapboxToken ? "Mapbox token: from NEXT_PUBLIC_MAPBOX_TOKEN" : "Mapbox token: none (canvas basemap)");
 console.log(`wrote ${out} (${(html.length / 1024 / 1024).toFixed(2)} MB)`);

@@ -87,7 +87,12 @@ export function MapView(props: MapViewProps) {
       loadMapbox()
         .then((mapbox) => {
           if (cancelled) return;
-          attach(new MapboxMapEngine(mapbox, host, latest.current.token, engineOptions(), fallBack));
+          // Mapbox's stylesheet makes its container `position: relative`, which would collapse
+          // our absolutely positioned host; give it its own full-size child, sized inline.
+          const mapHost = document.createElement("div");
+          Object.assign(mapHost.style, { position: "absolute", inset: "0" });
+          host.appendChild(mapHost);
+          attach(new MapboxMapEngine(mapbox, mapHost, latest.current.token, engineOptions(), fallBack));
         })
         .catch(fallBack);
     } else {
