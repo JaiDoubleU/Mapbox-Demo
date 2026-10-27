@@ -316,6 +316,8 @@ class MapboxMap {
       this.map.easeTo({ center: [w.lng, w.lat], duration: 500 });
     }
   }
+  // Screen position relative to the map container, so the selection overlays work on Mapbox too.
+  _project(lng, lat) { const p = this.map.project([lng, lat]); return { x: p.x, y: p.y }; }
   destroy() { try { this.map.remove(); } catch (e) {} }
 }
 

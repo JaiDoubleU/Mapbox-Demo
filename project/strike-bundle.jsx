@@ -1140,6 +1140,8 @@ class MapboxMap {
       if (w) this.map.easeTo({ center: [w.lng, w.lat], duration: 500 });
     }
   }
+  // Screen position relative to the map container, so the selection overlays work on Mapbox too.
+  _project(lng, lat) { const p = this.map.project([lng, lat]); return { x: p.x, y: p.y }; }
   setSelectedLeases(idxs) {
     if (!this.map.getLayer("leases-sel")) return;
     const arr = Array.isArray(idxs) ? idxs : [];
@@ -3361,8 +3363,9 @@ function App() {
     const eng = mapEngineRef.current;
     const view = {
       id: 'v_' + Date.now(), name, createdAt: Date.now(),
-      center: eng ? { lng: eng.cLng, lat: eng.cLat } : { lng: -101, lat: 32 },
-      scale: eng ? eng.scale : 2600,
+      center: eng && eng.map ? { lng: eng.map.getCenter().lng, lat: eng.map.getCenter().lat } : eng ? { lng: eng.cLng, lat: eng.cLat } : { lng: -101, lat: 32 },
+      scale: eng && eng.map ? undefined : eng ? eng.scale : 2600,
+      zoom: eng && eng.map ? eng.map.getZoom() : undefined,
       layers: Object.assign({}, layers),
       selectedIdxs: recordIds.slice(),
       selectedCount: recordIds.length,
@@ -3376,7 +3379,8 @@ function App() {
 
   const handleLoadView = React.useCallback(function(view) {
     const eng = mapEngineRef.current;
-    if (eng && eng.cLng !== undefined) { eng.cLng = view.center.lng; eng.cLat = view.center.lat; eng.scale = view.scale; eng.draw(); }
+    if (eng && eng.map) { eng.map.jumpTo(Object.assign({ center: [view.center.lng, view.center.lat] }, view.zoom != null ? { zoom: view.zoom } : {})); }
+    else if (eng && eng.cLng !== undefined) { eng.cLng = view.center.lng; eng.cLat = view.center.lat; if (view.scale) eng.scale = view.scale; eng.draw(); }
     setLayers(view.layers);
     setRecordIds(view.selectedIdxs || []);
     setActive(0);
