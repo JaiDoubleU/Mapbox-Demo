@@ -40,7 +40,11 @@ npm run fetch:basemaps          # optional: Mapbox snapshots for the canvas base
 npm run build:artifact          # writes dist-artifact/index.html, a single self-contained page
 ```
 
-The claude.ai Artifact sandbox blocks Mapbox, so the preview uses the canvas renderer. When
+The page has a `window.STRIKE_CONFIG` block at the very top: paste a `pk.…` token into
+`mapboxToken` (or use Tweaks → Mapbox token) and, opened from your own computer, the page loads
+Mapbox GL 3.9.0 from unpkg and shows the live map. If the library, token or style fails to load,
+it falls back to the canvas renderer. The claude.ai Artifact sandbox blocks Mapbox, so the
+published preview always uses the canvas renderer. When
 `src/generated/basemap-images.json` has snapshots (from `fetch:basemaps`, or from a Claude session
 with the Mapbox connector), the canvas draws them under the wells in place of the synthetic roads.
 Snapshots are static: zooming far in shows them soft. Only Default Light and Default Dark are

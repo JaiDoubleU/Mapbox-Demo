@@ -64,7 +64,17 @@ export class MapboxMapEngine implements MapEngine {
   private hoverIdx: number | null = null;
   private styleUrl: string;
 
-  constructor(mapbox: MapboxModule, container: HTMLElement, token: string, private opts: EngineOptions) {
+  private styleLoaded = false;
+  private failTimer: ReturnType<typeof setTimeout>;
+
+  /** `onFail` fires if the first style never loads (bad token, blocked network, private style). */
+  constructor(
+    mapbox: MapboxModule,
+    container: HTMLElement,
+    token: string,
+    private opts: EngineOptions,
+    onFail: (err: unknown) => void = () => {},
+  ) {
     mapbox.accessToken = token;
     this.styleUrl = this.currentStyleUrl();
     this.map = new mapbox.Map({
@@ -74,7 +84,19 @@ export class MapboxMapEngine implements MapEngine {
       zoom: 10.4,
       attributionControl: false,
     });
-    this.map.on("style.load", () => this.addLayers());
+    const fail = (err: unknown) => {
+      if (this.styleLoaded) return;
+      clearTimeout(this.failTimer);
+      this.styleLoaded = true; // report once
+      onFail(err);
+    };
+    this.failTimer = setTimeout(() => fail(new Error("Mapbox style did not load within 12s")), 12000);
+    this.map.on("error", (e) => fail(e.error));
+    this.map.on("style.load", () => {
+      this.styleLoaded = true;
+      clearTimeout(this.failTimer);
+      this.addLayers();
+    });
     this.map.on("click", (e) => this.onClick(e));
     this.map.on("mousemove", (e) => this.onMove(e));
   }
@@ -226,6 +248,7 @@ export class MapboxMapEngine implements MapEngine {
   }
 
   destroy() {
+    clearTimeout(this.failTimer);
     try {
       this.map.remove();
     } catch {

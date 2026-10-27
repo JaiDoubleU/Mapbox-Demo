@@ -19,8 +19,13 @@ export const DARK_BASEMAP_STYLES = [
 export const DEFAULT_LIGHT_STYLE = LIGHT_BASEMAP_STYLES[0].value;
 export const DEFAULT_DARK_STYLE = DARK_BASEMAP_STYLES[0].value;
 
-/** Public Mapbox token from the environment; without one the canvas basemap is used. */
-export const ENV_MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
+/**
+ * Public Mapbox token: NEXT_PUBLIC_MAPBOX_TOKEN for the Next.js app, or `window.STRIKE_CONFIG.mapboxToken`
+ * near the top of the single-file HTML build. Without one the canvas basemap is used.
+ */
+const pageConfig =
+  typeof window !== "undefined" ? (window as unknown as { STRIKE_CONFIG?: { mapboxToken?: string } }).STRIKE_CONFIG : undefined;
+export const ENV_MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || pageConfig?.mapboxToken || "";
 
 /** Placeholder until the app is wired to the signed-in user. */
 export const CURRENT_USER_INITIALS = process.env.NEXT_PUBLIC_USER_INITIALS ?? "JS";

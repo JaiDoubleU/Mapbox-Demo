@@ -6,6 +6,7 @@ import type { DrawToolId, Layers, MapTweaks, Theme } from "@/lib/types";
 import { CanvasMapEngine } from "./canvas-engine";
 import type { EngineOptions, MapEngine } from "./engine";
 import { MapboxMapEngine } from "./mapbox-engine";
+import { loadMapbox } from "@/lib/load-mapbox";
 
 export function isValidMapboxToken(token: string) {
   return token.startsWith("pk.") && token.length >= 40;
@@ -74,15 +75,21 @@ export function MapView(props: MapViewProps) {
     };
 
     if (useMapbox) {
-      import("mapbox-gl")
-        .then(({ default: mapbox }) => {
+      // If the library, the token or the style can't load (e.g. the claude.ai sandbox blocks
+      // Mapbox), drop back to the canvas basemap instead of leaving an empty map.
+      const fallBack = (err: unknown) => {
+        if (cancelled) return;
+        console.warn("Mapbox unavailable, using canvas basemap", err);
+        engine?.destroy();
+        host.innerHTML = "";
+        startCanvas();
+      };
+      loadMapbox()
+        .then((mapbox) => {
           if (cancelled) return;
-          attach(new MapboxMapEngine(mapbox, host, latest.current.token, engineOptions()));
+          attach(new MapboxMapEngine(mapbox, host, latest.current.token, engineOptions(), fallBack));
         })
-        .catch((err) => {
-          console.warn("Mapbox init failed, falling back to canvas basemap", err);
-          if (!cancelled) startCanvas();
-        });
+        .catch(fallBack);
     } else {
       startCanvas();
     }
