@@ -79,21 +79,27 @@ function buildSeries(production: ProductionMonth[], dca: DcaResult) {
   return { rates, gor: ratio("gor"), wor: ratio("wor") };
 }
 
+/** Series toggle; the unit is in its tooltip (and accessible name) rather than on the chip. */
 function ToggleChip({ on, label, unit, color, onClick }: { on: boolean; label: string; unit: string; color: string; onClick: () => void }) {
   return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onClick}
-      className={cn(
-        "inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-solid px-2 py-[3px] text-[11px] leading-none transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-primary/20",
-        on ? "border-s-line-strong bg-s-card text-s-text" : "border-s-line bg-transparent text-s-muted hover:text-s-text",
-      )}
-    >
-      <span className={cn("inline-block size-2 rounded-full border-2 border-solid")} style={{ borderColor: color, background: on ? color : "transparent" }} />
-      <span className="font-medium">{label}</span>
-      <span className="text-s-muted">{unit}</span>
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-pressed={on}
+          aria-label={`${label} (${unit})`}
+          onClick={onClick}
+          className={cn(
+            "inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-solid px-2 py-[3px] text-[11px] leading-none transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-primary/20",
+            on ? "border-s-line-strong bg-s-card text-s-text" : "border-s-line bg-transparent text-s-muted hover:text-s-text",
+          )}
+        >
+          <span className={cn("inline-block size-2 rounded-full border-2 border-solid")} style={{ borderColor: color, background: on ? color : "transparent" }} />
+          <span className="font-medium">{label}</span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top">{unit}</TooltipContent>
+    </Tooltip>
   );
 }
 
