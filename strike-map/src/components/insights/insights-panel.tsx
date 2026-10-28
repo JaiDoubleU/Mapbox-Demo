@@ -6,6 +6,7 @@ import { useDataset } from "@/lib/dataset-context";
 import type { Well } from "@/lib/strike-data";
 import type { ApiCopyMode, Layers } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { CopyApiButton } from "@/components/chrome/copy-api-button";
 import {
   ExportOptionsPopover,
@@ -340,16 +341,13 @@ export function InsightsPanel({
           sheet ? "mt-1" : "mt-2.5",
         )}
       >
-        <button
+        <Button
           onClick={() => (menuOpen ? closeMenu() : openMenu())}
           aria-expanded={menuOpen}
-          className={cn(
-            "flex h-12 flex-1 cursor-pointer items-center justify-center gap-[9px] rounded-md border-none text-base font-semibold text-white transition-[background,box-shadow] duration-[120ms] outline-none hover:bg-primary-hover focus-visible:ring-[3px] focus-visible:ring-ring/50",
-            menuOpen ? "bg-primary-hover shadow-[inset_0_2px_6px_rgba(0,0,0,0.25)]" : "bg-primary",
-          )}
+          className={cn("flex-1", menuOpen && "bg-primary-hover shadow-[inset_0_2px_6px_rgba(0,0,0,0.25)]")}
         >
           Export Options...
-        </button>
+        </Button>
         <CopyApiButton size="md" onCopy={copyApi} />
       </div>
     </div>
