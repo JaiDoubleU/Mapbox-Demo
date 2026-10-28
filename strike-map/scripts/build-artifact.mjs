@@ -62,7 +62,7 @@ css = css.replace(/url\((['"]?)\/fonts\/([^'")]+)\1\)/g, (_, _q, file) => {
 css += fs.readFileSync(path.join(root, "node_modules/mapbox-gl/dist/mapbox-gl.css"), "utf8");
 
 const bundle = js.outputFiles[0].text.replace(/<\/script/gi, "<\\/script");
-const html = `<title>Enverus STRIKE Map</title>
+const html = `<title>Strike Prototype</title>
 <script>
   /* ===== STRIKE settings — edit here ===========================================
      mapboxToken: paste a public Mapbox token ("pk.…") for the live Mapbox map.
