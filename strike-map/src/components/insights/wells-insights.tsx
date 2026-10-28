@@ -340,10 +340,6 @@ function Benchmarks({ wells }: { wells: Well[] }) {
   const m = METRICS[metric];
   const body = () => (
     <>
-      <div className="mb-2.5 flex flex-wrap gap-x-3 gap-y-2">
-        <Picker label="Metric:" value={metric} options={(Object.keys(METRICS) as Metric[]).map((k) => [k, METRICS[k].label])} onChange={setMetric} />
-        <Picker label="By:" value={by} options={(["operator", "formation"] as GroupBy[]).map((k) => [k, GROUP_LABELS[k]])} onChange={setBy} />
-      </div>
       {res.overall.n > 0 && (
         <Kpis
           items={[
@@ -400,13 +396,18 @@ const RATE_KEYS = ["oil", "gas", "water"] as const;
 const DECLINE_LIMIT = { oil: 2, gas: 10, water: 1 } as const;
 const DECLINE_VOL = { oil: { unit: "Mbbl", div: 1e3 }, gas: { unit: "MMcf", div: 1e3 }, water: { unit: "Mbbl", div: 1e3 } } as const;
 
-/** One button of the series toggle group: just the word, the unit in a tooltip. */
-function DeclineToggleItem({ item }: { item: (typeof DECLINE_ITEMS)[number] }) {
+/** One button of the series toggle group: the series colour dot and word, the unit in a tooltip. */
+function DeclineToggleItem({ item, on }: { item: (typeof DECLINE_ITEMS)[number]; on: boolean }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         {/* The tooltip trigger overwrites data-state, so the pressed style keys off aria-pressed. */}
-        <ToggleGroupItem value={item.key} className="h-7 px-2 text-xs aria-pressed:bg-accent aria-pressed:text-accent-foreground">
+        <ToggleGroupItem value={item.key} className="h-7 gap-1.5 px-2 text-xs aria-pressed:bg-accent aria-pressed:text-accent-foreground">
+          {/* The series colour: filled when on, a ring when off. */}
+          <span
+            className="inline-block size-2 rounded-full border-2 border-solid"
+            style={{ borderColor: item.color, background: on ? item.color : "transparent" }}
+          />
           {item.label}
         </ToggleGroupItem>
       </TooltipTrigger>
@@ -498,7 +499,7 @@ function DeclineView({
         className="mb-2 w-full"
       >
         {DECLINE_ITEMS.map((item) => (
-          <DeclineToggleItem key={item.key} item={item} />
+          <DeclineToggleItem key={item.key} item={item} on={on.includes(item.key)} />
         ))}
       </ToggleGroup>
       <label className="mb-2 flex items-center gap-1.5 text-xs text-s-text">
