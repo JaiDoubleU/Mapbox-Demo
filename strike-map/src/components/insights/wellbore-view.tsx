@@ -11,6 +11,8 @@ const kLabel = (v: number) => (v === 0 ? "0" : `${Math.round(v / 1000)}k`);
 
 /* Casing strings drawn as nested pipe outlines along the path, widest first. */
 const CASING_WIDTH: Record<string, number> = { Conductor: 30, Surface: 24, Intermediate: 18, Production: 13 };
+/** Full-screen view: wider strings with clear gaps between them. */
+const CASING_WIDTH_DETAILED: Record<string, number> = { Surface: 52, Intermediate: 38, Production: 24 };
 const PIPE = "color-mix(in srgb, var(--s-text) 68%, transparent)";
 const CASING_SHORT: Record<string, string> = { Surface: "Surface", Intermediate: "Inter.", Production: "Prod." };
 /** "10-3/4" → "10.750" */
@@ -73,6 +75,9 @@ export function WellboreSchematic({ wb, height = 250, detailed = false }: { wb: 
   };
   const tops = wb.formationTops.filter((t) => t.tvd < yMax);
   const annX = detailed ? width - 4 : M.left + iw;
+  const casingWidth = detailed ? CASING_WIDTH_DETAILED : CASING_WIDTH;
+  // Pipe interiors are painted in the surface colour behind the chart (the dialog is a different card).
+  const bg = detailed ? "var(--card)" : "var(--s-card)";
   const casing = detailed ? wb.casing.filter((c) => c.name !== "Conductor") : wb.casing;
   // Formation labels down the right edge, wrapped and nudged apart so they never overlap.
   const LINE = 12;
@@ -159,12 +164,12 @@ export function WellboreSchematic({ wb, height = 250, detailed = false }: { wb: 
 
         {/* casing strings: outline then interior, widest first, so they read as nested pipes */}
         {casing.map((c) => {
-          const wpx = CASING_WIDTH[c.name] ?? 9;
+          const wpx = casingWidth[c.name] ?? 9;
           const p = pts(c.bottomMdFt);
           return (
             <g key={c.name}>
               <polyline points={p} fill="none" stroke={PIPE} strokeWidth={wpx} strokeLinejoin="round" />
-              <polyline points={p} fill="none" stroke="var(--s-card)" strokeWidth={wpx - 3} strokeLinejoin="round" />
+              <polyline points={p} fill="none" stroke={bg} strokeWidth={wpx - (detailed ? 2.5 : 3)} strokeLinejoin="round" />
             </g>
           );
         })}
@@ -185,13 +190,15 @@ export function WellboreSchematic({ wb, height = 250, detailed = false }: { wb: 
         {/* casing sizes, outermost first, in place of the wellhead */}
         {detailed &&
           casing.map((c, i) => {
-            const x0 = sx(top.x) - (CASING_WIDTH[casing[0].name] ?? 24) / 2 - 2;
-            const w = Number(sizeDecimal(c.sizeIn)) * 4.6;
+            // Each bracket spans its string's drawn width, centred on the wellbore; labels align right of the widest.
+            const cx = sx(top.x),
+              w = casingWidth[c.name] ?? 24,
+              wMax = casingWidth[casing[0].name] ?? 24;
             const yy = sy(0) - 40 + i * 14;
             return (
               <g key={c.name}>
-                <path d={`M${x0},${yy} h${w} M${x0},${yy - 3} v6 M${x0 + w},${yy - 3} v6`} stroke={PIPE} strokeWidth={1.25} fill="none" />
-                <text x={x0 + Math.max(w, Number(sizeDecimal(casing[0].sizeIn)) * 4.6) + 6} y={yy + 3.5} fontSize={10.5} fill="var(--s-text)">
+                <path d={`M${cx - w / 2},${yy} h${w} M${cx - w / 2},${yy - 3} v6 M${cx + w / 2},${yy - 3} v6`} stroke={PIPE} strokeWidth={1.25} fill="none" />
+                <text x={cx + wMax / 2 + 6} y={yy + 3.5} fontSize={10.5} fill="var(--s-text)">
                   {`${(CASING_SHORT[c.name] ?? c.name).toUpperCase()} ${sizeDecimal(c.sizeIn)}"`}
                 </text>
               </g>
@@ -224,7 +231,7 @@ export function WellboreSchematic({ wb, height = 250, detailed = false }: { wb: 
           MD {n0(wb.mdFt)} ft · TVD {n0(wb.tvdFt)} ft
         </text>
 
-        {hp && <circle cx={sx(hp.x)} cy={sy(hp.tvd)} r={5} fill="var(--primary)" stroke="var(--s-card)" strokeWidth={2} pointerEvents="none" />}
+        {hp && <circle cx={sx(hp.x)} cy={sy(hp.tvd)} r={5} fill="var(--primary)" stroke={bg} strokeWidth={2} pointerEvents="none" />}
       </svg>
       {hp && (
         <div

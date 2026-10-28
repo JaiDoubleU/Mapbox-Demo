@@ -84,16 +84,20 @@ export function getWellbore(w: Well, det: WellDetails): Wellbore {
   const tvd = det.tvdFt;
   const lateral = det.lateralFt;
 
-  // ---- path: vertical with slight drift, build curve to 90°, then the lateral
+  // ---- path: vertical with an S-shaped nudge (drift out, then hold), build curve to 90°, then the lateral
   const path: PathPoint[] = [];
-  const drift = rflt(80, 320);
+  const drift = rflt(250, 550);
+  const nudge = (z: number) => {
+    const u = Math.min(1, Math.max(0, (z / kop - 0.15) / 0.5)); // drifts between 15% and 65% of KOP
+    return u * u * (3 - 2 * u);
+  };
   const radius = lateral ? rint(700, 1100) : 0;
   const kop = lateral ? tvd - radius : tvd;
   let md = 0;
   const step = 100;
   for (let z = 0; z <= kop; z += step) {
     md = z;
-    path.push({ md, tvd: z, x: drift * Math.sin((z / kop) * Math.PI * 0.5) ** 2, inc: 0.5 + rnd() * 1.5 });
+    path.push({ md, tvd: z, x: drift * nudge(z), inc: 0.5 + rnd() * 1.5 });
   }
   if (lateral) {
     const x0 = path[path.length - 1].x;
