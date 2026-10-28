@@ -136,7 +136,7 @@ export function DcaForecast({ production, state, height = 180 }: { production: P
           <SeriesItem key={r} value={r} on={on[r]} label={RATIO_META[r].label} unit={RATIO_META[r].unit} color={RATIO_META[r].color} />
         ))}
       </ToggleGroup>
-      {!nothing && <DcaChart series={rates} secondary={ratio} height={height} />}
+      {!nothing && <DcaChart series={rates} secondaries={ratio ? [ratio] : []} height={height} />}
       {nothing && <p className="m-0 py-6 text-center text-xs text-s-muted">Turn on a series to see the forecast.</p>}
       <div className="mt-1.5 flex items-center gap-3 text-xs text-s-muted">
         <span className="inline-flex items-center gap-1">

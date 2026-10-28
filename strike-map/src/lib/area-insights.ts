@@ -198,7 +198,8 @@ export interface TypeCurve {
  * Daily rate by month on production across horizontal wells: P10 / P50 / P90 at each month,
  * kept while enough wells contribute. Optionally normalised to a common lateral length.
  */
-export function typeCurve(d: StrikeDataset, wells: Well[], stream: Stream, normalizeFt: number | null): TypeCurve {
+export type RateStream = Stream | "water";
+export function typeCurve(d: StrikeDataset, wells: Well[], stream: RateStream, normalizeFt: number | null): TypeCurve {
   const hz = wells
     .map((w) => ({ w, det: detailsFor(d, w) }))
     .filter(({ det }) => det.lateralFt && det.production.length >= 6);

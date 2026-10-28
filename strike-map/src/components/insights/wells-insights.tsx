@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import {
   benchmarks,
@@ -24,6 +26,7 @@ import type { Well } from "@/lib/strike-data";
 import { cn } from "@/lib/utils";
 import { fmtK, Legend, RangePlot, StackedAreaChart, StackedBarChart, TypeCurveChart } from "./area-charts";
 import { QuickInsights } from "./quick-insights";
+import { DcaChart, elapsedDate, type DcaSeries } from "./dca-chart";
 import { InsightCard } from "./insight-card";
 import { downloadText } from "@/lib/download";
 import { ActionLinks, card } from "./record-detail";
@@ -343,37 +346,179 @@ function TypeCurveView({ wells, stream, setStream, normalize, setNormalize }: Cu
   return <Expandable title="Type Curve" render={body} />;
 }
 
-function DeclineView({ wells, stream, setStream, normalize, setNormalize }: CurveProps) {
+type DeclineToggle = "oil" | "gas" | "water" | "gor" | "wor";
+const DECLINE_ITEMS: { key: DeclineToggle; label: string; unit: string; color: string }[] = [
+  { key: "oil", label: "Oil", unit: "BBL/d", color: "var(--chart-oil)" },
+  { key: "gas", label: "Gas", unit: "MCF/d", color: "var(--chart-gas)" },
+  { key: "water", label: "Water", unit: "BBL/d", color: "var(--chart-water)" },
+  { key: "gor", label: "GOR", unit: "scf/bbl", color: "var(--chart-gor)" },
+  { key: "wor", label: "WOR", unit: "bbl/bbl", color: "var(--chart-wor)" },
+];
+const RATE_KEYS = ["oil", "gas", "water"] as const;
+// Economic limits for the forecast, per day.
+const DECLINE_LIMIT = { oil: 2, gas: 10, water: 1 } as const;
+const DECLINE_VOL = { oil: { unit: "Mbbl", div: 1e3 }, gas: { unit: "MMcf", div: 1e3 }, water: { unit: "Mbbl", div: 1e3 } } as const;
+
+/** One button of the series toggle group: just the word, the unit in a tooltip. */
+function DeclineToggleItem({ item }: { item: (typeof DECLINE_ITEMS)[number] }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {/* The tooltip trigger overwrites data-state, so the pressed style keys off aria-pressed. */}
+        <ToggleGroupItem value={item.key} className="h-7 px-2 text-xs aria-pressed:bg-accent aria-pressed:text-accent-foreground">
+          {item.label}
+        </ToggleGroupItem>
+      </TooltipTrigger>
+      <TooltipContent side="top">Measured in {item.unit}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function DeclineView({ wells, normalize, setNormalize }: Pick<CurveProps, "wells" | "normalize" | "setNormalize">) {
   const d = useDataset();
-  const curve = React.useMemo(() => typeCurve(d, wells, stream, normalize ? NORMALIZE_FT : null), [d, wells, stream, normalize]);
-  const dca = React.useMemo(() => typeCurveDca(curve, 30, stream === "oil" ? 2 : 10), [curve, stream]);
-  const s = STREAM[stream];
+  // Oil, gas and water each toggle on their own; GOR and WOR each add a log axis on the right.
+  const [on, setOn] = React.useState<DeclineToggle[]>(["oil", "gas", "water"]);
+  const fits = React.useMemo(
+    () =>
+      Object.fromEntries(
+        RATE_KEYS.map((k) => {
+          const curve = typeCurve(d, wells, k, normalize ? NORMALIZE_FT : null);
+          return [k, { curve, dca: typeCurveDca(curve, 30, DECLINE_LIMIT[k]) }];
+        }),
+      ) as Record<(typeof RATE_KEYS)[number], { curve: ReturnType<typeof typeCurve>; dca: ReturnType<typeof typeCurveDca> }>,
+    [d, wells, normalize],
+  );
+  const wellCount = fits.oil.curve.wells;
+  const monthly = (pts: { t: number; v: number }[]) => pts.map((p) => ({ month: elapsedDate(p.t), v: p.v }));
+  const series = React.useMemo(() => {
+    const out = {} as Record<DeclineToggle, DcaSeries | null>;
+    for (const item of DECLINE_ITEMS) {
+      const base = { key: item.key, label: item.label, unit: item.unit, color: item.color };
+      if (item.key === "gor" || item.key === "wor") {
+        const num = fits[item.key === "gor" ? "gas" : "water"],
+          den = fits.oil;
+        if (!num.dca || !den.dca) {
+          out[item.key] = null;
+          continue;
+        }
+        const scale = item.key === "gor" ? 1000 : 1;
+        const over = (a: { t: number; v: number }[], b: { t: number; v: number }[]) => {
+          const bm = new Map(b.map((p) => [p.t, p.v]));
+          return a.filter((p) => (bm.get(p.t) ?? 0) > 0).map((p) => ({ t: p.t, v: (p.v * scale) / bm.get(p.t)! }));
+        };
+        const pts = (c: typeof num) => c.curve.points.filter((p) => p.p50 > 0).map((p) => ({ t: p.t, v: p.p50 }));
+        out[item.key] = {
+          ...base,
+          actual: monthly(over(pts(num), pts(den))),
+          fit: monthly(over(num.dca.fit, den.dca.fit)),
+          forecast: monthly(over(num.dca.forecast, den.dca.forecast)),
+        };
+      } else {
+        const { curve, dca } = fits[item.key];
+        out[item.key] = dca
+          ? {
+              ...base,
+              actual: monthly(curve.points.filter((p) => p.p50 > 0).map((p) => ({ t: p.t, v: p.p50 }))),
+              fit: monthly(dca.fit),
+              forecast: monthly(dca.forecast),
+            }
+          : null;
+      }
+    }
+    return out;
+  }, [fits]);
+  const rates = RATE_KEYS.filter((k) => on.includes(k)).flatMap((k) => (series[k] ? [series[k]!] : []));
+  const ratios = (["gor", "wor"] as const).filter((k) => on.includes(k)).flatMap((k) => (series[k] ? [series[k]!] : []));
+  const params = RATE_KEYS.filter((k) => on.includes(k) && fits[k].dca);
+  const any = wellCount > 0 && DECLINE_ITEMS.some((i) => series[i.key]);
   const body = (big: boolean) => (
     <>
-      <CurveControls stream={stream} setStream={setStream} normalize={normalize} setNormalize={setNormalize} />
-      {dca ? (
+      <ToggleGroup
+        type="multiple"
+        variant="outline"
+        size="sm"
+        value={on}
+        onValueChange={(v) => setOn(v as DeclineToggle[])}
+        aria-label="Series"
+        className="mb-2 w-full"
+      >
+        {DECLINE_ITEMS.map((item) => (
+          <DeclineToggleItem key={item.key} item={item} />
+        ))}
+      </ToggleGroup>
+      <label className="mb-2 flex items-center gap-1.5 text-xs text-s-text">
+        <Switch checked={normalize} onCheckedChange={setNormalize} aria-label={`Normalize to ${NORMALIZE_FT.toLocaleString("en-US")} ft lateral`} />
+        Normalize to 10k ft
+      </label>
+      {!any ? (
+        <p className="m-0 py-6 text-center text-xs text-s-muted">Not enough horizontal wells with production history to fit a decline curve.</p>
+      ) : rates.length + ratios.length === 0 ? (
+        <p className="m-0 py-6 text-center text-xs text-s-muted">Turn on a series to see the forecast.</p>
+      ) : (
         <>
-          <Kpis
-            items={[
-              { label: `qi (${s.rate.toLowerCase()})`, value: fmtK(dca.params.qi) },
-              { label: "Di (%/yr)", value: fmtNum(dca.params.di * 100, 0) },
-              { label: "b", value: dca.params.b.toFixed(2) },
-              { label: `P50 EUR (${s.vol})`, value: fmtNum(dca.eur / s.volDiv, 0) },
-            ]}
-          />
-          <TypeCurveChart points={curve.points} color={s.color} unit={s.rate} fit={dca.fit} forecast={dca.forecast} height={big ? 380 : 200} />
+          <DcaChart series={rates} secondaries={ratios} elapsed height={big ? 380 : 200} />
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-s-muted">
+            <span className="inline-flex items-center gap-1">
+              <svg width="14" height="6" aria-hidden="true">
+                <circle cx="3" cy="3" r="1.9" fill="currentColor" />
+                <circle cx="10" cy="3" r="1.9" fill="currentColor" />
+              </svg>
+              P50
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <svg width="16" height="6" aria-hidden="true">
+                <line x1="0" x2="16" y1="3" y2="3" stroke="currentColor" strokeWidth="1.5" />
+              </svg>
+              Fit
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <svg width="16" height="6" aria-hidden="true">
+                <line x1="0" x2="16" y1="3" y2="3" stroke="currentColor" strokeWidth="2" strokeDasharray="6 4" />
+              </svg>
+              Forecast
+            </span>
+          </div>
+          {params.length > 0 && (
+            <table className="mt-2.5 w-full border-collapse text-xs">
+              <thead>
+                <tr className="text-left text-s-muted">
+                  <th className="pb-1 font-medium">Series</th>
+                  <th className="pb-1 text-right font-medium">qi (/d)</th>
+                  <th className="pb-1 text-right font-medium">Di (%/yr)</th>
+                  <th className="pb-1 text-right font-medium">b</th>
+                  <th className="pb-1 text-right font-medium">P50 EUR</th>
+                </tr>
+              </thead>
+              <tbody>
+                {params.map((k) => {
+                  const dca = fits[k].dca!;
+                  const item = DECLINE_ITEMS.find((i) => i.key === k)!;
+                  return (
+                    <tr key={k} className="border-t border-border tabular-nums">
+                      <th scope="row" className="py-1 text-left font-normal text-s-text">
+                        {item.label}
+                      </th>
+                      <td className="py-1 text-right text-s-text">{fmtK(dca.params.qi)}</td>
+                      <td className="py-1 text-right text-s-text">{fmtNum(dca.params.di * 100, 0)}</td>
+                      <td className="py-1 text-right text-s-text">{dca.params.b.toFixed(2)}</td>
+                      <td className="py-1 text-right text-s-text">
+                        {fmtNum(dca.eur / DECLINE_VOL[k].div, 0)} {DECLINE_VOL[k].unit}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
           <p className="m-0 mt-1.5 text-xs text-s-muted">
-            Arps hyperbolic fit to the P50 type curve of {curve.wells.toLocaleString("en-US")} wells
-            {normalize ? `, normalized to ${NORMALIZE_FT.toLocaleString("en-US")} ft` : ""}; {dca.years}-year forecast, terminal decline{" "}
-            {Math.round(dca.params.dMin * 100)}%/yr.
+            Arps hyperbolic fit to the P50 type curve of {wellCount.toLocaleString("en-US")} wells
+            {normalize ? `, normalized to ${NORMALIZE_FT.toLocaleString("en-US")} ft` : ""}; 30-year forecast to the economic limit.
           </p>
         </>
-      ) : (
-        <p className="m-0 py-6 text-center text-xs text-s-muted">Not enough horizontal wells with production history to fit a decline curve.</p>
       )}
     </>
   );
-  return <Expandable title="Decline Curve Analysis" render={body} />;
+  return <Expandable title="DCA Forecast" render={body} />;
 }
 
 interface CurveProps {
@@ -404,7 +549,7 @@ export function WellsInsights({ wells }: { wells: Well[] }) {
       ) : view === WELL_AREA_ACTIONS[2] ? (
         <TypeCurveView {...curve} />
       ) : (
-        <DeclineView {...curve} />
+        <DeclineView wells={wells} normalize={normalize} setNormalize={setNormalize} />
       )}
     </div>
   );
