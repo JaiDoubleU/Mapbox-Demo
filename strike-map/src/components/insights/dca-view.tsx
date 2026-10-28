@@ -92,7 +92,7 @@ function SeriesItem({ value, on, label, unit, color }: { value: Toggle; on: bool
         <ToggleGroupItem
           value={value}
           aria-label={`${label} (${unit})`}
-          className="h-7 gap-1.5 px-2 text-[11px] aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+          className="h-7 gap-1.5 px-2 text-xs aria-pressed:bg-accent aria-pressed:text-accent-foreground"
         >
           <span className="inline-block size-2 rounded-full border-2 border-solid" style={{ borderColor: color, background: on ? color : "transparent" }} />
           {label}
@@ -138,7 +138,7 @@ export function DcaForecast({ production, state, height = 180 }: { production: P
       </ToggleGroup>
       {!nothing && <DcaChart series={rates} secondary={ratio} height={height} />}
       {nothing && <p className="m-0 py-6 text-center text-xs text-s-muted">Turn on a series to see the forecast.</p>}
-      <div className="mt-1.5 flex items-center gap-3 text-[11px] text-s-muted">
+      <div className="mt-1.5 flex items-center gap-3 text-xs text-s-muted">
         <span className="inline-flex items-center gap-1">
           <svg width="14" height="6" aria-hidden="true">
             <circle cx="3" cy="3" r="1.9" fill="currentColor" />
@@ -344,7 +344,7 @@ export function ResourceEstimates({ dca, production, lateralFt }: { dca: DcaResu
           ["End Date", fmtMonthYear(dca.endDate)],
         ].map(([k, v]) => (
           <div key={k} className="rounded-md bg-s-bg px-2.5 py-2">
-            <dt className="text-[11px] text-s-muted">{k}</dt>
+            <dt className="text-xs text-s-muted">{k}</dt>
             <dd className="m-0 mt-0.5 text-[13px] font-semibold text-s-text tabular-nums">{v}</dd>
           </div>
         ))}
@@ -355,10 +355,10 @@ export function ResourceEstimates({ dca, production, lateralFt }: { dca: DcaResu
             <th className="pb-1.5 text-left" />
             {STREAMS.map((s) => (
               <th key={s} className="pb-1.5 text-right font-semibold">
-                <div className="text-[11px] uppercase" style={{ color: STREAM_META[s].color }}>
+                <div className="text-xs uppercase" style={{ color: STREAM_META[s].color }}>
                   {STREAM_META[s].label}
                 </div>
-                <div className="text-[10px] font-normal text-s-muted">{STREAM_META[s].volUnit}</div>
+                <div className="text-xs font-normal text-s-muted">{STREAM_META[s].volUnit}</div>
               </th>
             ))}
           </tr>
@@ -368,7 +368,7 @@ export function ResourceEstimates({ dca, production, lateralFt }: { dca: DcaResu
             <tr key={r.key} className="border-t border-s-line">
               <th scope="row" className="py-[7px] pr-2 text-left font-normal text-s-text">
                 {r.label}
-                {r.key === "eurft" && <span className="ml-1 text-[10px] text-s-muted">(BBL · MCF)</span>}
+                {r.key === "eurft" && <span className="ml-1 text-xs text-s-muted">(BBL · MCF)</span>}
               </th>
               {STREAMS.map((s) => (
                 <td key={s} className="py-[7px] pl-2 text-right font-mono font-medium text-s-text tabular-nums">

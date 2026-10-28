@@ -129,11 +129,11 @@ export function ExportHistoryDialog({ open, onOpenChange, jobs, onDownload, onDe
                   {/* Phones: date and status move under the details. */}
                   <div className="mt-0.5 flex flex-wrap gap-x-2 text-[12.5px] md:hidden">
                     <span className="text-s-text">{job.time}</span>
-                    <span className="text-[11px] leading-[19px] font-bold tracking-[.3px] text-primary">{job.status}</span>
+                    <span className="text-xs leading-[19px] font-bold tracking-[.3px] text-primary">{job.status}</span>
                   </div>
                 </div>
                 <div className="hidden min-w-0 flex-[1.3] text-[12.5px] text-s-text md:block">{job.time}</div>
-                <span className="hidden w-[92px] shrink-0 text-[11px] font-bold tracking-[.3px] text-primary md:inline">{job.status}</span>
+                <span className="hidden w-[92px] shrink-0 text-xs font-bold tracking-[.3px] text-primary md:inline">{job.status}</span>
                 <RowIconButton icon={Trash2} title="Delete" danger onClick={() => onDelete(job.id)} />
               </div>
             ))}

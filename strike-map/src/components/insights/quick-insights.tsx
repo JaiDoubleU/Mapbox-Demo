@@ -28,7 +28,7 @@ export function QuickInsights({ items, groups, limit = 8 }: { items: Well[]; gro
                 return <BarRow key={label} label={label} count={count} max={rows[0][1]} color={color} dot={color} labelWidth={140} />;
               })}
               {rows.length > limit && (
-                <div className="mt-1 text-[11px] text-s-muted">
+                <div className="mt-1 text-xs text-s-muted">
                   +{rows.length - limit} more ({rows.slice(limit).reduce((s, [, c]) => s + c, 0).toLocaleString("en-US")})
                 </div>
               )}

@@ -23,7 +23,7 @@ const TYPE_COLORS: Record<string, string> = {
   "Plugged & Abandoned": "#b9c0c7",
 };
 
-const eyebrow = "text-[11px] font-semibold text-s-muted uppercase";
+const eyebrow = "text-xs font-semibold text-s-muted uppercase";
 
 interface InsightsPanelProps {
   records: Well[];
@@ -234,7 +234,7 @@ export function InsightsPanel({
             <span className="h-1 w-9 rounded-full bg-s-line-strong" aria-hidden="true" />
             <span className="flex w-full items-center justify-between">
               <span className={eyebrow}>{active ? "Selected Record" : "Explore this Area"}</span>
-              <span className="flex items-center gap-1 text-[11px] font-medium text-s-muted">
+              <span className="flex items-center gap-1 text-xs font-medium text-s-muted">
                 {expanded ? "Less" : "More"}
                 {expanded ? <ChevronDown size={14} strokeWidth={1.75} /> : <ChevronUp size={14} strokeWidth={1.75} />}
               </span>
@@ -337,7 +337,7 @@ export function InsightsPanel({
                         ].map(([n, label]) => (
                           <div key={label} className="flex-1 rounded-md border border-s-line bg-s-bg px-3 py-2">
                             <div className="text-lg leading-none font-bold text-s-text">{n.toLocaleString()}</div>
-                            <div className="mt-1 text-[11px] text-s-muted">{label}</div>
+                            <div className="mt-1 text-xs text-s-muted">{label}</div>
                           </div>
                         ))}
                       </div>

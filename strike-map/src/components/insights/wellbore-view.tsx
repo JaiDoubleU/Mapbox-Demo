@@ -235,7 +235,7 @@ export function WellboreSchematic({ wb, height = 250, detailed = false }: { wb: 
       </svg>
       {hp && (
         <div
-          className="pointer-events-none absolute z-10 rounded-md border border-border bg-popover px-2.5 py-1.5 text-[11px] whitespace-nowrap text-popover-foreground tabular-nums shadow-[var(--shadow-overlay)]"
+          className="pointer-events-none absolute z-10 rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs whitespace-nowrap text-popover-foreground tabular-nums shadow-[var(--shadow-overlay)]"
           style={{
             top: Math.min(height - 70, Math.max(0, sy(hp.tvd) - 70)),
             ...(sx(hp.x) > width / 2 ? { right: width - sx(hp.x) + 10 } : { left: sx(hp.x) + 10 }),

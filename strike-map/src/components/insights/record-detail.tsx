@@ -15,7 +15,7 @@ import { downloadText, fileSafe } from "@/lib/download";
 import { ChartHeader, type ChartTools } from "./chart-header";
 import { DcaForecast, exportDcaCsv, ModifyDialog, ResourceEstimates, useDca } from "./dca-view";
 
-export const eyebrow = "text-[11px] font-semibold text-s-muted uppercase";
+export const eyebrow = "text-xs font-semibold text-s-muted uppercase";
 export const card = "card";
 const n0 = (v: number) => Math.round(v).toLocaleString("en-US");
 const n1 = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -80,7 +80,7 @@ function KpiTiles({ tiles }: { tiles: { value: string; label: string }[] }) {
       {tiles.map((t) => (
         <div key={t.label} className={cn(card, "flex-1 px-2 py-2.5 text-center")}>
           <div className="text-base leading-none font-bold text-s-text tabular-nums">{t.value}</div>
-          <div className="mt-1.5 text-[11px] leading-tight text-s-muted">{t.label}</div>
+          <div className="mt-1.5 text-xs leading-tight text-s-muted">{t.label}</div>
         </div>
       ))}
     </div>

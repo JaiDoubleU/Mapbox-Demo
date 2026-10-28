@@ -32,10 +32,10 @@ export function InsightTabs({ value, counts, onChange }: { value: InsightTab; co
         const n = counts[t.id];
         const on = value === t.id;
         return (
-          <ToggleGroupItem key={t.id} value={t.id} disabled={n === 0} aria-label={n == null ? t.label : `${t.label} (${n})`} className="h-7 gap-0.5 px-2 text-[11px]">
+          <ToggleGroupItem key={t.id} value={t.id} disabled={n === 0} aria-label={n == null ? t.label : `${t.label} (${n})`} className="h-7 gap-0.5 px-2 text-xs">
             {t.label}
             {n != null && (
-              <Badge variant={on ? "default" : "secondary"} className="h-4 rounded-full px-1.5 py-0 text-[10px] leading-none tabular-nums">
+              <Badge variant={on ? "default" : "secondary"} className="h-4 rounded-full px-1.5 py-0 text-xs leading-none tabular-nums">
                 {n.toLocaleString("en-US")}
               </Badge>
             )}

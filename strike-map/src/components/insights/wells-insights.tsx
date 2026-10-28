@@ -52,7 +52,7 @@ function StreamTabs({ value, onChange }: { value: Stream; onChange: (s: Stream) 
           aria-selected={value === s}
           onClick={() => onChange(s)}
           className={cn(
-            "cursor-pointer border-none bg-transparent p-0 text-[10px] font-semibold uppercase outline-none focus-visible:underline",
+            "cursor-pointer border-none bg-transparent p-0 text-xs font-semibold uppercase outline-none focus-visible:underline",
             value === s ? "text-s-text" : "text-s-faint hover:text-s-muted",
           )}
         >
@@ -89,7 +89,7 @@ function Kpis({ items }: { items: { label: string; value: string }[] }) {
       {items.map((k) => (
         <div key={k.label} className="flex-1 rounded-md bg-s-bg px-2 py-1.5 text-center">
           <div className="text-[13px] font-semibold text-s-text tabular-nums">{k.value}</div>
-          <div className="mt-0.5 text-[10px] leading-tight text-s-muted">{k.label}</div>
+          <div className="mt-0.5 text-xs leading-tight text-s-muted">{k.label}</div>
         </div>
       ))}
     </div>
@@ -148,7 +148,7 @@ function HistoricalProduction({ wells }: { wells: Well[] }) {
       <StackedAreaChart months={months} groups={data.groups} values={values} unit={STREAM[stream].rate} height={big ? 380 : 190} />
       {n > 1 && (
         <div className="mt-1 flex items-center gap-2 pl-[38px]">
-          <span className="rounded border border-s-line-strong px-1.5 py-0.5 text-[10px] text-s-text tabular-nums">{year(a)}</span>
+          <span className="rounded border border-s-line-strong px-1.5 py-0.5 text-xs text-s-text tabular-nums">{year(a)}</span>
           <Slider
             min={0}
             max={n - 1}
@@ -159,7 +159,7 @@ function HistoricalProduction({ wells }: { wells: Well[] }) {
             thumbLabels={["Start month", "End month"]}
             className="flex-1"
           />
-          <span className="rounded border border-s-line-strong px-1.5 py-0.5 text-[10px] text-s-text tabular-nums">{year(b)}</span>
+          <span className="rounded border border-s-line-strong px-1.5 py-0.5 text-xs text-s-text tabular-nums">{year(b)}</span>
         </div>
       )}
     </>
@@ -168,7 +168,7 @@ function HistoricalProduction({ wells }: { wells: Well[] }) {
     <>
       <Card className="gap-3 rounded-lg border-s-line bg-s-card py-3 shadow-none">
         <CardHeader className="chart-header border-b border-orange-500 px-3.5 [.border-b]:pb-2">
-          <CardTitle className="min-w-0 truncate text-[11px] font-semibold whitespace-nowrap text-s-muted normal-case">{title}</CardTitle>
+          <CardTitle className="min-w-0 truncate text-xs font-semibold whitespace-nowrap text-s-muted normal-case">{title}</CardTitle>
           <CardAction>
             <ChartToolButtons title={title} tools={{ onExport: exportCsv, onMaximize: () => setOpen(true) }} />
           </CardAction>
@@ -243,7 +243,7 @@ function SpudYear({ wells }: { wells: Well[] }) {
               setFrom(String(y0));
               setTo(String(y1));
             }}
-            className="h-6 rounded-full px-2 text-[11px]"
+            className="h-6 rounded-full px-2 text-xs"
           >
             Reset
           </Button>
@@ -297,7 +297,7 @@ function Benchmarks({ wells }: { wells: Well[] }) {
         />
       )}
       <RangePlot rows={res.byGroup} overall={res.overall} unit={m.unit} digits={m.digits} />
-      <p className="m-0 mt-1.5 text-[11px] text-s-muted">
+      <p className="m-0 mt-1.5 text-xs text-s-muted">
         {res.overall.n.toLocaleString("en-US")} horizontal wells. Bar spans P90–P10, dot is P50; dashed line is the overall P50.
       </p>
     </>
@@ -321,7 +321,7 @@ function CurveControls({
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
       <StreamTabs value={stream} onChange={setStream} />
-      <label className="mb-2 flex items-center gap-1.5 text-[11px] text-s-text">
+      <label className="mb-2 flex items-center gap-1.5 text-xs text-s-text">
         <Switch checked={normalize} onCheckedChange={setNormalize} aria-label={`Normalize to ${NORMALIZE_FT.toLocaleString("en-US")} ft lateral`} />
         Normalize to 10k ft
       </label>
@@ -370,7 +370,7 @@ function DeclineView({ wells, stream, setStream, normalize, setNormalize }: Curv
             ]}
           />
           <TypeCurveChart points={curve.points} color={s.color} unit={s.rate} fit={dca.fit} forecast={dca.forecast} height={big ? 380 : 200} />
-          <p className="m-0 mt-1.5 text-[11px] text-s-muted">
+          <p className="m-0 mt-1.5 text-xs text-s-muted">
             Arps hyperbolic fit to the P50 type curve of {curve.wells.toLocaleString("en-US")} wells
             {normalize ? `, normalized to ${NORMALIZE_FT.toLocaleString("en-US")} ft` : ""}; {dca.years}-year forecast, terminal decline{" "}
             {Math.round(dca.params.dMin * 100)}%/yr.

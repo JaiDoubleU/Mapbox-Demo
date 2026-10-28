@@ -10,7 +10,7 @@ import { DARK_BASEMAP_STYLES, LIGHT_BASEMAP_STYLES } from "@/lib/config";
 import type { Tweaks } from "@/hooks/use-tweaks";
 
 function Section({ label }: { label: string }) {
-  return <div className="pt-2.5 text-[10px] font-semibold tracking-[.06em] text-s-muted uppercase first:pt-0">{label}</div>;
+  return <div className="pt-2.5 text-xs font-semibold tracking-[.06em] text-s-muted uppercase first:pt-0">{label}</div>;
 }
 
 function Row({ label, value, children, inline }: { label: string; value?: string; children: React.ReactNode; inline?: boolean }) {

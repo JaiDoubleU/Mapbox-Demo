@@ -191,7 +191,7 @@ export function DcaChart({
       </svg>
       {hoverM != null && (
         <div
-          className="pointer-events-none absolute top-1 z-10 rounded-md border border-border bg-popover px-2.5 py-1.5 text-[11px] whitespace-nowrap text-popover-foreground tabular-nums shadow-[var(--shadow-overlay)]"
+          className="pointer-events-none absolute top-1 z-10 rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs whitespace-nowrap text-popover-foreground tabular-nums shadow-[var(--shadow-overlay)]"
           style={hx > width / 2 ? { right: width - hx + 8 } : { left: hx + 8 }}
         >
           <div className="mb-0.5 font-semibold">{fmtMonth(new Date(Math.floor(hoverM / 12), hoverM % 12, 1))}</div>

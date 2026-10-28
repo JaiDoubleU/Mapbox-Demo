@@ -88,7 +88,7 @@ function ExportRow({
       <Checkbox id={id} checked={on} disabled={row.disabled} onCheckedChange={(v) => onChecked(v === true)} />
       <label htmlFor={id} className={cn("flex-1", row.disabled ? "cursor-default" : "cursor-pointer")}>
         <div className="text-sm font-medium text-s-text">{row.label}</div>
-        {row.note && <div className="mt-px text-[11px] text-popover-foreground">{row.note}</div>}
+        {row.note && <div className="mt-px text-xs text-popover-foreground">{row.note}</div>}
       </label>
       {row.geomOptions && on && (
         <Select value={geometry} onValueChange={onGeometry}>

@@ -223,7 +223,7 @@ export function ProductionChart({ data, height = 150 }: { data: ProductionMonth[
       </svg>
       {hp && (
         <div
-          className="pointer-events-none absolute top-1 z-10 rounded-md border border-border bg-popover px-2.5 py-1.5 text-[11px] text-popover-foreground shadow-[var(--shadow-overlay)]"
+          className="pointer-events-none absolute top-1 z-10 rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-[var(--shadow-overlay)]"
           style={hx > width / 2 ? { right: width - hx + 8 } : { left: hx + 8 }}
         >
           <div className="mb-0.5 font-semibold">{fmtMonth(hp.month)}</div>
@@ -238,7 +238,7 @@ export function ProductionChart({ data, height = 150 }: { data: ProductionMonth[
           ))}
         </div>
       )}
-      <div className="mt-1 flex flex-wrap justify-center gap-x-3 gap-y-1 text-[11px] text-s-muted">
+      <div className="mt-1 flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-s-muted">
         {SERIES.map((s) => (
           <span key={s.key} className="flex items-center gap-1.5">
             <svg width={16} height={6} aria-hidden="true">

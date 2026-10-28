@@ -95,7 +95,7 @@ export function AISelectOverlay({ layers, density, additive, onSelectMulti }: AI
       <div className="flex items-center gap-[7px] border-b border-border px-3.5 py-[11px]">
         <Sparkles size={14} strokeWidth={1.75} color="var(--primary)" />
         <span className="text-xs font-semibold tracking-[.3px] text-s-text">AI Selection</span>
-        <span className="ml-0.5 text-[11px] text-s-muted">— describe what to select</span>
+        <span className="ml-0.5 text-xs text-s-muted">— describe what to select</span>
         <button
           onClick={() => setReady(false)}
           title="Close"
@@ -154,7 +154,7 @@ export function AISelectOverlay({ layers, density, additive, onSelectMulti }: AI
                 setPhase("idle");
                 timers.current.push(window.setTimeout(() => inputRef.current?.focus(), 0));
               }}
-              className="h-6 cursor-pointer rounded-full border border-border bg-transparent px-2.5 text-[11px] text-s-muted"
+              className="h-6 cursor-pointer rounded-full border border-border bg-transparent px-2.5 text-xs text-s-muted"
             >
               {s}
             </button>

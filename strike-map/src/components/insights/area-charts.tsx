@@ -31,7 +31,7 @@ function useWidth(min = 220) {
 function Tip({ x, width, children }: { x: number; width: number; children: React.ReactNode }) {
   return (
     <div
-      className="pointer-events-none absolute top-1 z-10 rounded-md border border-border bg-popover px-2.5 py-1.5 text-[11px] whitespace-nowrap text-popover-foreground tabular-nums shadow-[var(--shadow-overlay)]"
+      className="pointer-events-none absolute top-1 z-10 rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs whitespace-nowrap text-popover-foreground tabular-nums shadow-[var(--shadow-overlay)]"
       style={x > width / 2 ? { right: width - x + 8 } : { left: x + 8 }}
     >
       {children}
@@ -51,7 +51,7 @@ function TipRow({ color, label, value }: { color: string; label: string; value: 
 
 export function Legend({ groups, className }: { groups: Group[]; className?: string }) {
   return (
-    <ul className={cn("m-0 mt-2 flex list-none flex-wrap gap-x-3 gap-y-1 p-0 text-[11px] text-s-text", className)}>
+    <ul className={cn("m-0 mt-2 flex list-none flex-wrap gap-x-3 gap-y-1 p-0 text-xs text-s-text", className)}>
       {groups.map((g) => (
         <li key={g.key} className="flex max-w-[180px] items-center gap-1.5">
           <span className="inline-block size-2 shrink-0 rounded-[2px]" style={{ background: g.color }} />
@@ -265,7 +265,7 @@ export function RangePlot({ rows, overall, unit, digits }: { rows: (Group & Spre
       </svg>
       {hover != null && (
         <div
-          className="pointer-events-none absolute z-10 rounded-md border border-border bg-popover px-2.5 py-1.5 text-[11px] whitespace-nowrap text-popover-foreground tabular-nums shadow-[var(--shadow-overlay)]"
+          className="pointer-events-none absolute z-10 rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs whitespace-nowrap text-popover-foreground tabular-nums shadow-[var(--shadow-overlay)]"
           style={{ top: top + hover * rowH + rowH, left: Math.max(0, Math.min(width - 190, x(rows[hover].p50) - 60)) }}
         >
           <div className="mb-0.5 font-semibold">
@@ -401,7 +401,7 @@ export function TypeCurveChart({
           )}
         </Tip>
       )}
-      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-s-muted">
+      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-s-muted">
         <span className="inline-flex items-center gap-1">
           <span className="inline-block h-2 w-3.5 rounded-[2px]" style={{ background: color, opacity: 0.3 }} />
           P90–P10

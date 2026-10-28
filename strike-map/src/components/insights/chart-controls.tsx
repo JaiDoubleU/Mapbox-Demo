@@ -13,10 +13,10 @@ export type YScale = "linear" | "log";
 export function ScaleToggle({ value, onChange }: { value: YScale; onChange: (v: YScale) => void }) {
   return (
     <ToggleGroup type="single" variant="outline" size="sm" value={value} onValueChange={(v) => v && onChange(v as YScale)} aria-label="Y-axis scale">
-      <ToggleGroupItem value="linear" className="h-6 px-2 text-[11px]">
+      <ToggleGroupItem value="linear" className="h-6 px-2 text-xs">
         Linear
       </ToggleGroupItem>
-      <ToggleGroupItem value="log" className="h-6 px-2 text-[11px]">
+      <ToggleGroupItem value="log" className="h-6 px-2 text-xs">
         Semi-log
       </ToggleGroupItem>
     </ToggleGroup>

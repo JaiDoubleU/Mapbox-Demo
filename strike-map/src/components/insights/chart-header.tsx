@@ -57,7 +57,7 @@ export function ChartHeader({ title, extra, tools, className }: { title: string;
   return (
     <div className={cn("chart-header mb-2 flex items-center justify-between border-b border-orange-500 pb-2", className)}>
       <div className="flex min-w-0 items-center gap-1.5">
-        <h3 className="m-0 truncate text-[11px] font-semibold text-s-muted uppercase">{title}</h3>
+        <h3 className="m-0 truncate text-xs font-semibold text-s-muted uppercase">{title}</h3>
         {extra}
       </div>
       <ChartToolButtons title={title} tools={tools} />
