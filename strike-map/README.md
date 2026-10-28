@@ -25,7 +25,8 @@ responsive export-dialog height. Values persist in `localStorage`.
 The app is a static-friendly Next.js app with no server-side code.
 
 1. **Vercel:** import the repo and set **Root Directory** to `strike-map`. Add the environment
-   variable `NEXT_PUBLIC_MAPBOX_TOKEN`, then deploy.
+   variable `NEXT_PUBLIC_MAPBOX_TOKEN`, then deploy. `vercel.json` pins the framework and the
+   `npm ci` / `npm run build` commands. Or use the button: [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FJaiDoubleU%2FMapbox-Demo&root-directory=strike-map&env=NEXT_PUBLIC_MAPBOX_TOKEN&envDescription=Public%20Mapbox%20token%20(pk.%E2%80%A6)%20for%20the%20live%20map&envLink=https%3A%2F%2Faccount.mapbox.com%2Faccess-tokens%2F&project-name=mapbox-demo&repository-name=mapbox-demo)
 2. **Any Node host** (Azure App Service, a container): `npm ci && npm run build && npm start`
    with `NEXT_PUBLIC_MAPBOX_TOKEN` set at build time (Next inlines `NEXT_PUBLIC_*` values during the build).
 
