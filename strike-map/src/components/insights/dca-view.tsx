@@ -19,8 +19,8 @@ const STREAM_META: Record<Stream, { label: string; rateUnit: string; color: stri
 };
 type Ratio = "gor" | "wor";
 const RATIO_META: Record<Ratio, { label: string; unit: string; color: string; num: Stream; scale: number }> = {
-  gor: { label: "GOR", unit: "scf/bbl", color: "var(--chart-gas)", num: "gas", scale: 1000 },
-  wor: { label: "WOR", unit: "bbl/bbl", color: "var(--chart-water)", num: "water", scale: 1 },
+  gor: { label: "GOR", unit: "scf/bbl", color: "var(--chart-gor)", num: "gas", scale: 1000 },
+  wor: { label: "WOR", unit: "bbl/bbl", color: "var(--chart-wor)", num: "water", scale: 1 },
 };
 type Toggle = Stream | Ratio;
 
@@ -41,7 +41,9 @@ export function useDca(production: ProductionMonth[]) {
   const modified = Object.keys(overrides).length > 0 || endDate != null;
   // One Modify dialog per well, opened from the panel, the expanded view or the chart header.
   const [modifyOpen, setModifyOpen] = React.useState(false);
-  return { dca, fitted, overrides, setOverrides, endDate, setEndDate, reset, modified, modifyOpen, setModifyOpen };
+  // Series toggles, shared by the panel chart and its full-screen view.
+  const [on, setOn] = React.useState<Record<Toggle, boolean>>({ oil: true, gas: true, water: true, gor: false, wor: false });
+  return { dca, fitted, overrides, setOverrides, endDate, setEndDate, reset, modified, modifyOpen, setModifyOpen, on, setOn };
 }
 export type DcaState = ReturnType<typeof useDca>;
 
@@ -65,7 +67,8 @@ function buildSeries(production: ProductionMonth[], dca: DcaResult) {
   const ratio = (r: Ratio): DcaSeries => {
     const m = RATIO_META[r];
     const div = (a: number, b: number) => (b > 0 && a > 0 ? (a * m.scale) / b : 0);
-    const oil = dca.streams.oil, num = dca.streams[m.num];
+    const oil = dca.streams.oil,
+      num = dca.streams[m.num];
     return {
       key: r,
       label: m.label,
@@ -79,8 +82,22 @@ function buildSeries(production: ProductionMonth[], dca: DcaResult) {
   return { rates, gor: ratio("gor"), wor: ratio("wor") };
 }
 
-/** Series toggle; the unit is in its tooltip (and accessible name) rather than on the chip. */
-function ToggleChip({ on, label, unit, color, onClick }: { on: boolean; label: string; unit: string; color: string; onClick: () => void }) {
+/** One button in the series toggle group; its unit is in the tooltip (and accessible name). */
+function ToggleChip({
+  on,
+  label,
+  unit,
+  color,
+  first,
+  onClick,
+}: {
+  on: boolean;
+  label: string;
+  unit: string;
+  color: string;
+  first?: boolean;
+  onClick: () => void;
+}) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -90,43 +107,61 @@ function ToggleChip({ on, label, unit, color, onClick }: { on: boolean; label: s
           aria-label={`${label} (${unit})`}
           onClick={onClick}
           className={cn(
-            "inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-solid px-2 py-[3px] text-[11px] leading-none transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-primary/20",
-            on ? "border-s-line-strong bg-s-card text-s-text" : "border-s-line bg-transparent text-s-muted hover:text-s-text",
+            "inline-flex h-7 flex-1 cursor-pointer items-center justify-center gap-1.5 border-0 px-2 text-[11px] leading-none font-medium transition-colors outline-none focus-visible:z-[1] focus-visible:ring-[3px] focus-visible:ring-primary/20",
+            !first && "border-l border-solid border-s-line-strong",
+            on ? "bg-s-chip text-s-text" : "bg-transparent text-s-muted hover:text-s-text",
           )}
         >
-          <span className={cn("inline-block size-2 rounded-full border-2 border-solid")} style={{ borderColor: color, background: on ? color : "transparent" }} />
-          <span className="font-medium">{label}</span>
+          <span className="inline-block size-2 rounded-full border-2 border-solid" style={{ borderColor: color, background: on ? color : "transparent" }} />
+          {label}
         </button>
       </TooltipTrigger>
-      <TooltipContent side="top">{unit}</TooltipContent>
+      <TooltipContent side="top">Measured in {unit}</TooltipContent>
     </Tooltip>
   );
 }
 
 /** Legend toggles, the rate-time chart (plus GOR/WOR charts when on) and "Modify or Export Forecast". */
 export function DcaForecast({ production, state, height = 180 }: { production: ProductionMonth[]; state: DcaState; height?: number }) {
-  const [on, setOn] = React.useState<Record<Toggle, boolean>>({ oil: true, gas: true, water: true, gor: false, wor: false });
-  const { dca } = state;
+  const { dca, on, setOn } = state;
   const series = React.useMemo(() => (dca ? buildSeries(production, dca) : null), [production, dca]);
   if (!dca || !series) {
-    return <p className="m-0 py-3 text-xs text-s-muted">Not enough recent production to fit a decline curve. A forecast needs at least 6 months of history and production in the last 3 months.</p>;
+    return (
+      <p className="m-0 py-3 text-xs text-s-muted">
+        Not enough recent production to fit a decline curve. A forecast needs at least 6 months of history and production in the last 3 months.
+      </p>
+    );
   }
-  const flip = (k: Toggle) => setOn((o) => ({ ...o, [k]: !o[k] }));
+  // Rates toggle independently; GOR and WOR share the right axis, so turning one on turns the other off.
+  const flip = (k: Toggle) =>
+    setOn((o) => {
+      const next = { ...o, [k]: !o[k] };
+      if (next[k] && k === "gor") next.wor = false;
+      if (next[k] && k === "wor") next.gor = false;
+      return next;
+    });
   const rates = series.rates.filter((s) => on[s.key as Stream]);
-  const nothing = !rates.length && !on.gor && !on.wor;
+  const ratio = on.gor ? series.gor : on.wor ? series.wor : undefined;
+  const nothing = !rates.length && !ratio;
   return (
     <div>
-      <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label="Series">
-        {STREAMS.map((s) => (
-          <ToggleChip key={s} on={on[s]} label={STREAM_META[s].label} unit={STREAM_META[s].rateUnit} color={STREAM_META[s].color} onClick={() => flip(s)} />
+      <div className="mb-2 flex overflow-hidden rounded-md border border-solid border-s-line-strong" role="group" aria-label="Series">
+        {STREAMS.map((s, i) => (
+          <ToggleChip
+            key={s}
+            first={i === 0}
+            on={on[s]}
+            label={STREAM_META[s].label}
+            unit={STREAM_META[s].rateUnit}
+            color={STREAM_META[s].color}
+            onClick={() => flip(s)}
+          />
         ))}
         {(["gor", "wor"] as Ratio[]).map((r) => (
           <ToggleChip key={r} on={on[r]} label={RATIO_META[r].label} unit={RATIO_META[r].unit} color={RATIO_META[r].color} onClick={() => flip(r)} />
         ))}
       </div>
-      {rates.length > 0 && <DcaChart series={rates} height={height} />}
-      {on.gor && <DcaChart series={[series.gor]} height={Math.round(height * 0.6)} yLabel="GOR" />}
-      {on.wor && <DcaChart series={[series.wor]} height={Math.round(height * 0.6)} yLabel="WOR" />}
+      {!nothing && <DcaChart series={rates} secondary={ratio} height={height} />}
       {nothing && <p className="m-0 py-6 text-center text-xs text-s-muted">Turn on a series to see the forecast.</p>}
       <div className="mt-1.5 flex items-center gap-3 text-[11px] text-s-muted">
         <span className="inline-flex items-center gap-1">
@@ -182,7 +217,10 @@ export function ModifyDialog({ production, wellName, state }: { production: Prod
   const minYear = dca.forecastStart.getFullYear() + 1;
   const parsed = STREAMS.map((s) => {
     const d = draft[s];
-    const qi = Number(d.qi), di = Number(d.di) / 100, b = Number(d.b), dMin = Number(d.dMin) / 100;
+    const qi = Number(d.qi),
+      di = Number(d.di) / 100,
+      b = Number(d.b),
+      dMin = Number(d.dMin) / 100;
     const ok = qi > 0 && di > 0 && di < 100 && b >= 0 && b <= 2 && dMin >= 0 && dMin < di;
     return { s, ok, params: { qi, di, b, dMin } };
   });
@@ -253,9 +291,7 @@ export function ModifyDialog({ production, wellName, state }: { production: Prod
               ))}
             </tbody>
           </table>
-          {!parsed.every((p) => p.ok) && (
-            <p className="m-0 mt-1 text-xs text-destructive">qi and Di must be positive, b between 0 and 2, and Dmin below Di.</p>
-          )}
+          {!parsed.every((p) => p.ok) && <p className="m-0 mt-1 text-xs text-destructive">qi and Di must be positive, b between 0 and 2, and Dmin below Di.</p>}
           <label className="mt-3 flex items-center gap-2 text-xs text-s-text">
             Forecast end year
             <Input
@@ -265,7 +301,11 @@ export function ModifyDialog({ production, wellName, state }: { production: Prod
               aria-invalid={!yearOk || undefined}
               className={cn("h-8 w-20 px-2 text-xs tabular-nums", !yearOk && "border-destructive")}
             />
-            {!yearOk && <span className="text-destructive">Between {minYear} and {minYear + 60}</span>}
+            {!yearOk && (
+              <span className="text-destructive">
+                Between {minYear} and {minYear + 60}
+              </span>
+            )}
           </label>
         </div>
         <div className="flex flex-wrap items-center gap-2 border-t border-border px-[22px] py-3">

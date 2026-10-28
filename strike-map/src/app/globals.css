@@ -63,6 +63,9 @@
   --chart-oil: #2b7a1c;
   --chart-gas: #f2734a;
   --chart-water: #3b8fe0;
+  /* Ratio series on the DCA chart's right axis: GOR orange, WOR light blue. */
+  --chart-gor: #d98a00;
+  --chart-wor: #38a9db;
 
   /* Aliases referenced by the prototype that the DS file doesn't define. */
   --error: var(--destructive);
@@ -85,6 +88,8 @@
   --chart-oil: #52a93a;
   --chart-gas: #c03826;
   --chart-water: #4b8fd8;
+  --chart-gor: #f5a623;
+  --chart-wor: #7cc6f2;
   --shadow-soft: 0 1px 3px 0 rgb(0 0 0 / 0.35), 0 1px 2px -1px rgb(0 0 0 / 0.35);
   --shadow-overlay: 0 10px 15px -3px rgb(0 0 0 / 0.45), 0 4px 6px -4px rgb(0 0 0 / 0.45);
 }
