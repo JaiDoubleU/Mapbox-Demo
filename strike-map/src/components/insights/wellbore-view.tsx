@@ -12,8 +12,29 @@ const kLabel = (v: number) => (v === 0 ? "0" : `${Math.round(v / 1000)}k`);
 /* Casing strings drawn as nested pipe outlines along the path, widest first. */
 const CASING_WIDTH: Record<string, number> = { Conductor: 30, Surface: 24, Intermediate: 18, Production: 13 };
 const PIPE = "color-mix(in srgb, var(--s-text) 68%, transparent)";
+const CASING_SHORT: Record<string, string> = { Surface: "Surface", Intermediate: "Inter.", Production: "Prod." };
+/** "10-3/4" → "10.750" */
+const sizeDecimal = (s: string) => {
+  const [whole, frac] = s.split("-");
+  const [a, b] = (frac ?? "0/1").split("/").map(Number);
+  return (Number(whole) + a / b).toFixed(3);
+};
+/** Splits a label into lines of at most `max` characters, breaking at spaces. */
+function wrapLabel(text: string, max: number): string[] {
+  const lines: string[] = [];
+  for (const word of text.split(" ")) {
+    const cur = lines[lines.length - 1];
+    if (cur != null && (cur + " " + word).length <= max) lines[lines.length - 1] = cur + " " + word;
+    else lines.push(word);
+  }
+  return lines;
+}
 
-export function WellboreSchematic({ wb, height = 250 }: { wb: Wellbore; height?: number }) {
+/**
+ * TVD vs horizontal displacement. `detailed` (the full-screen view) adds casing-size callouts in
+ * place of the wellhead, labelled formation tops on the right and axis lines.
+ */
+export function WellboreSchematic({ wb, height = 250, detailed = false }: { wb: Wellbore; height?: number; detailed?: boolean }) {
   const ref = React.useRef<HTMLDivElement>(null);
   const [width, setWidth] = React.useState(320);
   const [hover, setHover] = React.useState<number | null>(null);
@@ -26,8 +47,9 @@ export function WellboreSchematic({ wb, height = 250 }: { wb: Wellbore; height?:
   }, []);
 
   // Top margin leaves room for the wellhead above surface.
-  const M = { left: 46, right: 14, top: 34, bottom: 34 };
-  const iw = width - M.left - M.right, ih = height - M.top - M.bottom;
+  const M = detailed ? { left: 52, right: 112, top: 58, bottom: 40 } : { left: 46, right: 14, top: 34, bottom: 34 };
+  const iw = width - M.left - M.right,
+    ih = height - M.top - M.bottom;
   const maxX = Math.max(1000, ...wb.path.map((p) => p.x)) * 1.05;
   const xStep = maxX > 6000 ? 1000 * Math.ceil(maxX / 9000) : 1000;
   const xMax = Math.ceil(maxX / xStep) * xStep;
@@ -45,10 +67,20 @@ export function WellboreSchematic({ wb, height = 250 }: { wb: Wellbore; height?:
   const xAtTvd = (tvd: number) => {
     const i = wb.path.findIndex((p) => p.tvd >= tvd);
     if (i <= 0) return (i === 0 ? wb.path[0] : wb.path[wb.path.length - 1]).x;
-    const a = wb.path[i - 1], b = wb.path[i];
+    const a = wb.path[i - 1],
+      b = wb.path[i];
     return a.x + ((tvd - a.tvd) / Math.max(1e-6, b.tvd - a.tvd)) * (b.x - a.x);
   };
   const tops = wb.formationTops.filter((t) => t.tvd < yMax);
+  const annX = detailed ? width - 4 : M.left + iw;
+  const casing = detailed ? wb.casing.filter((c) => c.name !== "Conductor") : wb.casing;
+  // Formation labels down the right edge, wrapped and nudged apart so they never overlap.
+  const LINE = 12;
+  const topLabels = tops.map((t) => ({ ...t, lines: wrapLabel(t.name.toUpperCase(), 16), ly: sy(t.tvd) }));
+  for (let i = 1; i < topLabels.length; i++) {
+    const prev = topLabels[i - 1];
+    topLabels[i].ly = Math.max(topLabels[i].ly, prev.ly + prev.lines.length * LINE);
+  }
 
   const xTicks: number[] = [];
   for (let v = 0; v <= xMax; v += xStep) xTicks.push(v);
@@ -58,8 +90,10 @@ export function WellboreSchematic({ wb, height = 250 }: { wb: Wellbore; height?:
 
   const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
-    const px = e.clientX - r.left, py = e.clientY - r.top;
-    let best = 0, bestD = Infinity;
+    const px = e.clientX - r.left,
+      py = e.clientY - r.top;
+    let best = 0,
+      bestD = Infinity;
     wb.path.forEach((p, i) => {
       const dd = (sx(p.x) - px) ** 2 + (sy(p.tvd) - py) ** 2;
       if (dd < bestD) {
@@ -86,13 +120,24 @@ export function WellboreSchematic({ wb, height = 250 }: { wb: Wellbore; height?:
       >
         {/* formation tops: faint dotted lines from the wellbore out to the right */}
         {tops.map((t) => {
-          const x0 = Math.min(M.left + iw, sx(xAtTvd(t.tvd)) + 18);
+          const x0 = detailed ? M.left : Math.min(M.left + iw, sx(xAtTvd(t.tvd)) + 18);
           return (
-            <line key={t.name} x1={x0} x2={M.left + iw} y1={sy(t.tvd)} y2={sy(t.tvd)} stroke="var(--s-line)" strokeDasharray="2 3">
+            <line key={t.name} x1={x0} x2={M.left + iw + (detailed ? 4 : 0)} y1={sy(t.tvd)} y2={sy(t.tvd)} stroke="var(--s-line)" strokeDasharray="2 3">
               <title>{`${t.name} · ${n0(t.tvd)} ft TVD`}</title>
             </line>
           );
         })}
+        {detailed &&
+          topLabels.map((t) => (
+            <text key={t.name} x={M.left + iw + 8} y={t.ly + 3} fontSize={10.5} fill="var(--s-text)" opacity={0.85}>
+              {t.lines.map((l, i) => (
+                <tspan key={i} x={M.left + iw + 8} dy={i ? LINE : 0}>
+                  {l}
+                </tspan>
+              ))}
+            </text>
+          ))}
+        {detailed && <path d={`M${M.left},${M.top} V${M.top + ih} H${M.left + iw}`} fill="none" stroke="var(--s-line-strong)" strokeWidth={1} />}
         {yTicks.map((v) => (
           <g key={`y${v}`}>
             <text x={M.left - 6} y={sy(v) + 3} textAnchor="end" fontSize={10} fill="var(--s-muted)">
@@ -113,7 +158,7 @@ export function WellboreSchematic({ wb, height = 250 }: { wb: Wellbore; height?:
         </text>
 
         {/* casing strings: outline then interior, widest first, so they read as nested pipes */}
-        {wb.casing.map((c) => {
+        {casing.map((c) => {
           const wpx = CASING_WIDTH[c.name] ?? 9;
           const p = pts(c.bottomMdFt);
           return (
@@ -126,37 +171,60 @@ export function WellboreSchematic({ wb, height = 250 }: { wb: Wellbore; height?:
         {/* wellbore, thick along the perforated (completed) interval */}
         <polyline points={pts(Infinity)} fill="none" stroke="var(--primary)" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
         {wb.perfTopMd != null && wb.perfBottomMd != null && (
-          <polyline points={pts(wb.perfBottomMd, wb.perfTopMd)} fill="none" stroke="var(--primary)" strokeWidth={7} strokeLinejoin="round" strokeLinecap="round">
+          <polyline
+            points={pts(wb.perfBottomMd, wb.perfTopMd)}
+            fill="none"
+            stroke="var(--primary)"
+            strokeWidth={7}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          >
             <title>{`Perforated ${n0(wb.perfTopMd)}–${n0(wb.perfBottomMd)} ft MD`}</title>
           </polyline>
         )}
-        {/* wellhead: cap, flange and body above surface */}
-        <g stroke={PIPE} strokeWidth={1.5} fill="none" strokeLinecap="round">
-          {(() => {
-            const cx = sx(top.x), y0 = sy(0);
+        {/* casing sizes, outermost first, in place of the wellhead */}
+        {detailed &&
+          casing.map((c, i) => {
+            const x0 = sx(top.x) - (CASING_WIDTH[casing[0].name] ?? 24) / 2 - 2;
+            const w = Number(sizeDecimal(c.sizeIn)) * 4.6;
+            const yy = sy(0) - 40 + i * 14;
             return (
-              <path
-                d={[
-                  `M${cx - 20},${y0 - 26} h40 M${cx - 20},${y0 - 30} v8 M${cx + 20},${y0 - 30} v8`,
-                  `M${cx - 6},${y0 - 26} v6 M${cx + 6},${y0 - 26} v6`,
-                  `M${cx - 15},${y0 - 20} h30 v7 h-30 z`,
-                  `M${cx - 10},${y0 - 13} v13 M${cx + 10},${y0 - 13} v13`,
-                ].join(" ")}
-              />
+              <g key={c.name}>
+                <path d={`M${x0},${yy} h${w} M${x0},${yy - 3} v6 M${x0 + w},${yy - 3} v6`} stroke={PIPE} strokeWidth={1.25} fill="none" />
+                <text x={x0 + Math.max(w, Number(sizeDecimal(casing[0].sizeIn)) * 4.6) + 6} y={yy + 3.5} fontSize={10.5} fill="var(--s-text)">
+                  {`${(CASING_SHORT[c.name] ?? c.name).toUpperCase()} ${sizeDecimal(c.sizeIn)}"`}
+                </text>
+              </g>
             );
-          })()}
-        </g>
+          })}
+        {/* wellhead: cap, flange and body above surface */}
+        {!detailed && (
+          <g stroke={PIPE} strokeWidth={1.5} fill="none" strokeLinecap="round">
+            {(() => {
+              const cx = sx(top.x),
+                y0 = sy(0);
+              return (
+                <path
+                  d={[
+                    `M${cx - 20},${y0 - 26} h40 M${cx - 20},${y0 - 30} v8 M${cx + 20},${y0 - 30} v8`,
+                    `M${cx - 6},${y0 - 26} v6 M${cx + 6},${y0 - 26} v6`,
+                    `M${cx - 15},${y0 - 20} h30 v7 h-30 z`,
+                    `M${cx - 10},${y0 - 13} v13 M${cx + 10},${y0 - 13} v13`,
+                  ].join(" ")}
+                />
+              );
+            })()}
+          </g>
+        )}
 
-        <text x={M.left + iw} y={M.top + 12} textAnchor="end" fontSize={11} fill="var(--s-text)">
+        <text x={annX} y={M.top + (detailed ? -38 : 12)} textAnchor="end" fontSize={11} fill="var(--s-text)">
           {wb.lateralFt ? `Effective Lat Length ${n0(wb.lateralFt)} ft` : "Vertical wellbore"}
         </text>
-        <text x={M.left + iw} y={M.top + 26} textAnchor="end" fontSize={11} fill="var(--s-text)">
+        <text x={annX} y={M.top + (detailed ? -22 : 26)} textAnchor="end" fontSize={11} fill="var(--s-text)">
           MD {n0(wb.mdFt)} ft · TVD {n0(wb.tvdFt)} ft
         </text>
 
-        {hp && (
-          <circle cx={sx(hp.x)} cy={sy(hp.tvd)} r={5} fill="var(--primary)" stroke="var(--s-card)" strokeWidth={2} pointerEvents="none" />
-        )}
+        {hp && <circle cx={sx(hp.x)} cy={sy(hp.tvd)} r={5} fill="var(--primary)" stroke="var(--s-card)" strokeWidth={2} pointerEvents="none" />}
       </svg>
       {hp && (
         <div
@@ -192,7 +260,8 @@ export function WellboreTables({ tables }: { tables: DataTable[] }) {
   const rows = !sort
     ? table.rows
     : [...table.rows].sort((a, b) => {
-        const va = a[sort.key], vb = b[sort.key];
+        const va = a[sort.key],
+          vb = b[sort.key];
         const cmp = col?.numeric ? asNumber(va) - asNumber(vb) : String(va).localeCompare(String(vb));
         return cmp * dir;
       });

@@ -61,16 +61,18 @@ function mulberry32(seed: number) {
   };
 }
 
+// Midland Basin tops as a fraction of the well's TVD.
 const FORMATION_TOPS: [string, number][] = [
-  ["Rustler", 0.1],
-  ["Salado", 0.16],
-  ["Yates", 0.27],
-  ["San Andres", 0.42],
-  ["Clearfork", 0.6],
-  ["Spraberry", 0.7],
-  ["Dean", 0.83],
-  ["Wolfcamp A", 0.88],
-  ["Wolfcamp B", 0.95],
+  ["Yates", 0.3],
+  ["Seven Rivers", 0.325],
+  ["Queen", 0.38],
+  ["Grayburg", 0.43],
+  ["San Andres - High Flows H2S Corrosive", 0.465],
+  ["Glorieta", 0.61],
+  ["Clearfork", 0.73],
+  ["Spraberry", 0.82],
+  ["Spraberry - Dean", 0.95],
+  ["Wolfcamp", 0.965],
 ];
 
 const fmtDate = (d: Date | null) => (d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—");
@@ -115,8 +117,8 @@ export function getWellbore(w: Well, det: WellDetails): Wellbore {
   const intShoe = lateral ? Math.round(kop - rint(200, 800)) : rint(40, 55) * 100;
   const casing: CasingString[] = [
     { name: "Conductor", sizeIn: "20", weightLbFt: 94, grade: "H-40", topFt: 0, bottomMdFt: rint(80, 120), cementSx: rint(150, 300) },
-    { name: "Surface", sizeIn: "13-3/8", weightLbFt: 54.5, grade: "J-55", topFt: 0, bottomMdFt: surfaceShoe, cementSx: rint(900, 1400) },
-    { name: "Intermediate", sizeIn: "9-5/8", weightLbFt: 40, grade: "HCP-110", topFt: 0, bottomMdFt: intShoe, cementSx: rint(1500, 2600) },
+    { name: "Surface", sizeIn: "10-3/4", weightLbFt: 45.5, grade: "J-55", topFt: 0, bottomMdFt: surfaceShoe, cementSx: rint(900, 1400) },
+    { name: "Intermediate", sizeIn: "7-5/8", weightLbFt: 29.7, grade: "HCP-110", topFt: 0, bottomMdFt: intShoe, cementSx: rint(1500, 2600) },
     { name: "Production", sizeIn: "5-1/2", weightLbFt: 20, grade: "P-110", topFt: 0, bottomMdFt: mdFt, cementSx: rint(2400, 4200) },
   ];
   const hasLiner = !lateral && rnd() < 0.3;
@@ -124,7 +126,6 @@ export function getWellbore(w: Well, det: WellDetails): Wellbore {
   // ---- tables
   const completion = det.timeline.find((t) => t.label === "Completion")?.date ?? null;
   const uwi = `${w.api}-00-00`;
-  const stages = lateral ? Math.round(lateral / rint(180, 240)) : rint(2, 6);
   const survey = path.filter((_, i) => i % 3 === 0 || i === path.length - 1).map((p) => ({
     md: Math.round(p.md),
     inc: p.inc.toFixed(1),
@@ -148,12 +149,12 @@ export function getWellbore(w: Well, det: WellDetails): Wellbore {
         { key: "date", label: "Completion Date" },
         { key: "upper", label: "Upper Perf (ft)", numeric: true },
         { key: "lower", label: "Lower Perf (ft)", numeric: true },
-        { key: "stages", label: "Stages", numeric: true },
+        { key: "lateral", label: "Effective Lat Length (ft)", numeric: true },
         { key: "proppant", label: "Proppant (lbs)", numeric: true },
-        { key: "fluid", label: "Fluid (bbl)", numeric: true },
+        { key: "fluid", label: "Total Fluid (bbl)", numeric: true },
       ],
       rows: completion
-        ? [{ uwi, date: fmtDate(completion), upper: n(heelMd), lower: n(perfBottomMd!), stages, proppant: det.proppantLbs ? n(det.proppantLbs) : "—", fluid: det.fluidBbl ? n(det.fluidBbl) : "—" }]
+        ? [{ uwi, date: fmtDate(completion), upper: n(heelMd), lower: n(perfBottomMd!), lateral: lateral ? n(lateral) : "—", proppant: det.proppantLbs ? n(det.proppantLbs) : "—", fluid: det.fluidBbl ? n(det.fluidBbl) : "—" }]
         : [],
       empty: "No completion reported yet.",
     },

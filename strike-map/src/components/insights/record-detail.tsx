@@ -342,20 +342,30 @@ export function RecordDetail({
       )}
       <ModifyDialog production={det.production} wellName={well.name} state={dcaState} />
       <Dialog open={expanded != null} onOpenChange={(o) => !o && setExpanded(null)}>
-        <DialogContent className="w-[min(760px,94vw)] rounded-2xl">
-          <div className="border-b border-border px-[22px] py-[18px] pr-14">
-            <DialogTitle className="text-lg font-semibold">
-              {expanded === "chart"
-                ? "Production Decline"
-                : expanded === "wellbore"
-                  ? "Wellbore & Completion Design"
-                  : expanded === "dca"
-                    ? "DCA Forecast"
-                    : "Timeline"} ·{" "}
-              {well.name}
-            </DialogTitle>
-          </div>
-          <div className="max-h-[75vh] overflow-y-auto px-[22px] py-4">
+        <DialogContent
+          className={cn("rounded-2xl", expanded === "wellbore" ? "w-[min(1240px,96vw)]" : "w-[min(760px,94vw)]")}
+          // Focus the dialog itself, so the title's info tooltip doesn't pop open.
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            (e.currentTarget as HTMLElement).focus();
+          }}
+        >
+          {expanded === "wellbore" ? (
+            <div className="border-b border-border px-[22px] py-[16px] pr-14">
+              <div className="flex items-center gap-1.5">
+                <DialogTitle className="text-lg font-semibold">Wellbore &amp; Completion Design</DialogTitle>
+                <SchematicInfo />
+              </div>
+              <div className="mt-1 text-xs text-s-muted uppercase">{[well.name, well.api, well.operator, well.formation].join(" · ")}</div>
+            </div>
+          ) : (
+            <div className="border-b border-border px-[22px] py-[18px] pr-14">
+              <DialogTitle className="text-lg font-semibold">
+                {expanded === "chart" ? "Production Decline" : expanded === "dca" ? "DCA Forecast" : "Timeline"} · {well.name}
+              </DialogTitle>
+            </div>
+          )}
+          <div className={cn("overflow-y-auto px-[22px] py-4", expanded === "wellbore" ? "max-h-[86vh]" : "max-h-[75vh]")}>
             {expanded === "chart" && <ProductionChart data={det.production} height={340} />}
             {expanded === "timeline" && <Timeline steps={det.timeline} />}
             {expanded === "dca" && dcaState.dca && (
@@ -368,8 +378,8 @@ export function RecordDetail({
             )}
             {expanded === "wellbore" && (
               <>
-                <WellboreSchematic wb={wellbore} height={420} />
-                <div className="mt-3">
+                <WellboreSchematic wb={wellbore} detailed height={Math.round(Math.max(380, Math.min(640, window.innerHeight - 400)))} />
+                <div className="mt-2">
                   <WellboreTables tables={wellbore.tables} />
                 </div>
               </>
