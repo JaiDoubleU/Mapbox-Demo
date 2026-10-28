@@ -64,24 +64,41 @@ export function Legend({ groups, className }: { groups: Group[]; className?: str
 
 const M = { left: 38, right: 10, top: 8, bottom: 20 };
 
-/** Stacked areas over months (e.g. production by operator). */
+/**
+ * Stacked areas over months (e.g. production by operator). With `zoomMode` on, dragging across
+ * the chart selects a span of months and calls `onZoom(first, last)` with indices into `months`;
+ * double-clicking calls `onResetZoom`.
+ */
 export function StackedAreaChart({
   months,
   groups,
   values,
   unit,
+  yLabel,
+  zoomMode = false,
+  onZoom,
+  onResetZoom,
   height = 190,
 }: {
   months: number[];
   groups: Group[];
   values: number[][];
   unit: string;
+  /** Rotated y-axis title, e.g. "Oil (BBL/D)". */
+  yLabel?: string;
+  zoomMode?: boolean;
+  onZoom?: (first: number, last: number) => void;
+  onResetZoom?: () => void;
   height?: number;
 }) {
   const [ref, width] = useWidth();
   const [hover, setHover] = React.useState<number | null>(null);
+  /** Drag selection in px while zooming. */
+  const [drag, setDrag] = React.useState<{ a: number; b: number } | null>(null);
   if (months.length < 2) return <div className="py-8 text-center text-xs text-s-muted">No production in this range.</div>;
-  const iw = width - M.left - M.right, ih = height - M.top - M.bottom;
+  const M = { left: yLabel ? 50 : 38, right: 10, top: 8, bottom: 20 };
+  const iw = width - M.left - M.right,
+    ih = height - M.top - M.bottom;
   const totals = months.map((_, i) => values.reduce((s, g) => s + g[i], 0));
   const yTicks = linearTicks(Math.max(1, ...totals));
   const yMax = yTicks[yTicks.length - 1];
@@ -96,10 +113,31 @@ export function StackedAreaChart({
     return `M${upper.join("L")}L${lower.join("L")}Z`;
   };
   const xTicks = timeTicks(keyToDate(months[0]).getTime(), keyToDate(months[months.length - 1]).getTime(), iw);
-  const xOf = (t: number) => M.left + ((t - keyToDate(months[0]).getTime()) / (keyToDate(months[months.length - 1]).getTime() - keyToDate(months[0]).getTime())) * iw;
+  const xOf = (t: number) =>
+    M.left + ((t - keyToDate(months[0]).getTime()) / (keyToDate(months[months.length - 1]).getTime() - keyToDate(months[0]).getTime())) * iw;
+  const clampPx = (px: number) => Math.min(Math.max(px, M.left), M.left + iw);
+  const idxAt = (px: number) => Math.max(0, Math.min(months.length - 1, Math.round(((px - M.left) / iw) * (months.length - 1))));
+  const localX = (e: React.PointerEvent<SVGSVGElement>) => e.clientX - e.currentTarget.getBoundingClientRect().left;
   const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
-    const px = e.clientX - e.currentTarget.getBoundingClientRect().left;
-    setHover(Math.max(0, Math.min(months.length - 1, Math.round(((px - M.left) / iw) * (months.length - 1)))));
+    const px = localX(e);
+    if (drag) return setDrag({ ...drag, b: clampPx(px) });
+    setHover(idxAt(px));
+  };
+  const onDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (!zoomMode) return onMove(e);
+    const px = clampPx(localX(e));
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setHover(null);
+    setDrag({ a: px, b: px });
+  };
+  const onUp = () => {
+    if (!drag) return;
+    const [pa, pb] = [Math.min(drag.a, drag.b), Math.max(drag.a, drag.b)];
+    setDrag(null);
+    // At least a few pixels and three months, so a plain click never zooms to nothing.
+    const i0 = idxAt(pa),
+      i1 = idxAt(pb);
+    if (pb - pa >= 6 && i1 - i0 >= 2) onZoom?.(i0, i1);
   };
   return (
     <div ref={ref} className="relative">
@@ -108,10 +146,13 @@ export function StackedAreaChart({
         height={height}
         role="img"
         aria-label={`Stacked ${unit} by ${groups.length} groups, ${fmtMonth(months[0])} to ${fmtMonth(months[months.length - 1])}`}
-        className="block touch-pan-y"
+        className={cn("block select-none", zoomMode ? "cursor-crosshair touch-none" : "touch-pan-y")}
         onPointerMove={onMove}
-        onPointerDown={onMove}
-        onPointerLeave={() => setHover(null)}
+        onPointerDown={onDown}
+        onPointerUp={onUp}
+        onPointerCancel={() => setDrag(null)}
+        onPointerLeave={() => !drag && setHover(null)}
+        onDoubleClick={onResetZoom}
       >
         {yTicks.map((v) => (
           <g key={v}>
@@ -121,6 +162,11 @@ export function StackedAreaChart({
             </text>
           </g>
         ))}
+        {yLabel && (
+          <text transform={`translate(10 ${M.top + ih / 2}) rotate(-90)`} textAnchor="middle" fontSize={10} fill="var(--s-muted)">
+            {yLabel}
+          </text>
+        )}
         {xTicks.map((t) => (
           <text key={t.t} x={xOf(t.t)} y={height - 5} textAnchor="middle" fontSize={10} fill="var(--s-muted)">
             {t.label}
@@ -130,9 +176,21 @@ export function StackedAreaChart({
         {groups.map((g, i) => (
           <path key={g.key} d={area(i)} fill={g.color} fillOpacity={0.85} stroke="var(--s-card)" strokeWidth={1} strokeLinejoin="round" />
         ))}
-        {hover != null && <line x1={x(hover)} x2={x(hover)} y1={M.top} y2={M.top + ih} stroke="var(--s-muted)" pointerEvents="none" />}
+        {drag && (
+          <rect
+            x={Math.min(drag.a, drag.b)}
+            y={M.top}
+            width={Math.abs(drag.b - drag.a)}
+            height={ih}
+            fill="color-mix(in srgb, var(--primary) 16%, transparent)"
+            stroke="var(--primary)"
+            strokeWidth={1}
+            pointerEvents="none"
+          />
+        )}
+        {hover != null && !drag && <line x1={x(hover)} x2={x(hover)} y1={M.top} y2={M.top + ih} stroke="var(--s-muted)" pointerEvents="none" />}
       </svg>
-      {hover != null && (
+      {hover != null && !drag && (
         <Tip x={x(hover)} width={width}>
           <div className="mb-0.5 font-semibold">
             {fmtMonth(months[hover])} · {fmtK(totals[hover])} {unit}
@@ -155,7 +213,8 @@ export function StackedBarChart({ years, groups, values, height = 170 }: { years
   const [ref, width] = useWidth();
   const [hover, setHover] = React.useState<number | null>(null);
   if (!years.length) return <div className="py-8 text-center text-xs text-s-muted">No wells spudded in this range.</div>;
-  const iw = width - M.left - M.right, ih = height - M.top - M.bottom;
+  const iw = width - M.left - M.right,
+    ih = height - M.top - M.bottom;
   const totals = years.map((_, i) => values.reduce((s, g) => s + g[i], 0));
   const yTicks = linearTicks(Math.max(1, ...totals));
   const yMax = yTicks[yTicks.length - 1];
@@ -167,7 +226,14 @@ export function StackedBarChart({ years, groups, values, height = 170 }: { years
   const step = [1, 2, 5, 10].find((s) => s >= labelStep) ?? 10;
   return (
     <div ref={ref} className="relative">
-      <svg width={width} height={height} role="img" aria-label={`Count by year, ${years[0]} to ${years[years.length - 1]}`} className="block" onPointerLeave={() => setHover(null)}>
+      <svg
+        width={width}
+        height={height}
+        role="img"
+        aria-label={`Count by year, ${years[0]} to ${years[years.length - 1]}`}
+        className="block"
+        onPointerLeave={() => setHover(null)}
+      >
         {yTicks.map((v) => (
           <g key={v}>
             <line x1={M.left} x2={M.left + iw} y1={y(v)} y2={y(v)} stroke="var(--s-line)" strokeDasharray="2 3" />
@@ -193,13 +259,22 @@ export function StackedBarChart({ years, groups, values, height = 170 }: { years
               {groups.map((g, gi) => {
                 const v = values[gi][i];
                 if (!v) return null;
-                const y0 = y(base), y1 = y(base + v);
+                const y0 = y(base),
+                  y1 = y(base + v);
                 base += v;
                 // 1px surface gap between stacked segments
                 return <rect key={g.key} x={x(i)} y={y1} width={bw} height={Math.max(0.5, y0 - y1 - 1)} fill={g.color} />;
               })}
               {/* hit target: the whole column, wider than the bar */}
-              <rect x={M.left + band * i} y={M.top} width={band} height={ih} fill="transparent" onPointerEnter={() => setHover(i)} onPointerDown={() => setHover(i)} />
+              <rect
+                x={M.left + band * i}
+                y={M.top}
+                width={band}
+                height={ih}
+                fill="transparent"
+                onPointerEnter={() => setHover(i)}
+                onPointerDown={() => setHover(i)}
+              />
             </g>
           );
         })}
@@ -228,7 +303,10 @@ export function RangePlot({ rows, overall, unit, digits }: { rows: (Group & Spre
   const [hover, setHover] = React.useState<number | null>(null);
   if (!rows.length) return <div className="py-8 text-center text-xs text-s-muted">No horizontal wells with this data.</div>;
   const labelW = Math.min(130, width * 0.38);
-  const L = labelW + 8, R = 12, rowH = 24, top = 6;
+  const L = labelW + 8,
+    R = 12,
+    rowH = 24,
+    top = 6;
   // ~6.4px per character at 11px, so long names truncate instead of running off the left edge.
   const maxChars = Math.max(6, Math.floor(labelW / 6.4));
   const iw = width - L - R;
@@ -247,7 +325,16 @@ export function RangePlot({ rows, overall, unit, digits }: { rows: (Group & Spre
             </text>
           </g>
         ))}
-        <line x1={x(overall.p50)} x2={x(overall.p50)} y1={top - 2} y2={top + rows.length * rowH} stroke="var(--s-text)" strokeWidth={1} strokeDasharray="4 3" opacity={0.6} />
+        <line
+          x1={x(overall.p50)}
+          x2={x(overall.p50)}
+          y1={top - 2}
+          y2={top + rows.length * rowH}
+          stroke="var(--s-text)"
+          strokeWidth={1}
+          strokeDasharray="4 3"
+          opacity={0.6}
+        />
         {rows.map((r, i) => {
           const cy = top + i * rowH + rowH / 2;
           return (
@@ -258,7 +345,15 @@ export function RangePlot({ rows, overall, unit, digits }: { rows: (Group & Spre
               </text>
               <line x1={x(r.p90)} x2={x(r.p10)} y1={cy} y2={cy} stroke={r.color} strokeWidth={4} strokeLinecap="round" opacity={0.45} />
               <circle cx={x(r.p50)} cy={cy} r={4.5} fill={r.color} stroke="var(--s-card)" strokeWidth={2} />
-              <rect x={0} y={cy - rowH / 2} width={width} height={rowH} fill="transparent" onPointerEnter={() => setHover(i)} onPointerDown={() => setHover(i)} />
+              <rect
+                x={0}
+                y={cy - rowH / 2}
+                width={width}
+                height={rowH}
+                fill="transparent"
+                onPointerEnter={() => setHover(i)}
+                onPointerDown={() => setHover(i)}
+              />
             </g>
           );
         })}

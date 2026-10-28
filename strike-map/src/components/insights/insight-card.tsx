@@ -50,9 +50,24 @@ export function InsightCard({
   const drawerOpen = editorOpen ?? drawerLocal;
   const setDrawer = (o: boolean) => (onEditorOpenChange ? onEditorOpenChange(o) : setDrawerLocal(o));
   const drawerRef = React.useRef<HTMLDivElement>(null);
-  // Move focus into the drawer when it opens.
+  // While the drawer is open: Esc closes it (unless a select or menu inside took the key first),
+  // and focus moves into it once its slide-in has started (an element that is still hidden can't
+  // take focus), unless the user has already clicked into a field.
   React.useEffect(() => {
-    if (drawerOpen) drawerRef.current?.focus();
+    if (!drawerOpen) return;
+    const t = setTimeout(() => {
+      const d = drawerRef.current;
+      if (d && !d.contains(document.activeElement)) d.focus();
+    }, 60);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.defaultPrevented) setDrawer(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("keydown", onKey);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawerOpen]);
   const edit = editor ? () => setDrawer(true) : onEdit;
   const maximize = onMaximize ?? (renderExpanded ? () => setOpen(true) : undefined);
@@ -99,12 +114,6 @@ export function InsightCard({
             aria-hidden={!drawerOpen}
             inert={!drawerOpen}
             tabIndex={-1}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.stopPropagation();
-                setDrawer(false);
-              }
-            }}
             className={cn(
               "absolute inset-y-0 right-0 z-20 flex w-[min(22rem,100%)] flex-col border-l border-border bg-card shadow-[var(--shadow-overlay)] outline-none transition-[translate,visibility] duration-300 ease-out motion-reduce:transition-none",
               drawerOpen ? "translate-x-0 visible" : "invisible translate-x-full",

@@ -24,6 +24,7 @@ import { fmtK, Legend, RangePlot, StackedAreaChart, StackedBarChart } from "./ar
 import { QuickInsights } from "./quick-insights";
 import { DcaChart, elapsedDate, type DcaSeries } from "./dca-chart";
 import { EditorActions, FieldRow, GroupLabel, NumberField, SelectField, SwitchField } from "./card-editor";
+import { ZoomControls } from "./chart-controls";
 import { InsightCard } from "./insight-card";
 import { downloadText } from "@/lib/download";
 import { ActionLinks, card } from "./record-detail";
@@ -42,33 +43,6 @@ const fmtNum = (v: number, digits = 0) => v.toLocaleString("en-US", { minimumFra
 // ---- small controls -----------------------------------------------------------------
 
 /** Oil / Gas text tabs above a chart. */
-/** Oil / Gas Production as a single-select toggle group (the active one stays on when pressed again). */
-function StreamTabs({ value, onChange }: { value: Stream; onChange: (s: Stream) => void }) {
-  return (
-    <ToggleGroup
-      type="single"
-      variant="outline"
-      size="sm"
-      value={value}
-      onValueChange={(v) => v && onChange(v as Stream)}
-      aria-label="Stream"
-      className="mb-2 w-full"
-    >
-      {(["oil", "gas"] as Stream[]).map((s) => (
-        <Tooltip key={s}>
-          <TooltipTrigger asChild>
-            {/* The tooltip trigger overwrites data-state, so the pressed style keys off aria-checked. */}
-            <ToggleGroupItem value={s} className="h-7 px-2 text-xs aria-checked:bg-accent aria-checked:text-accent-foreground">
-              {STREAM[s].label}
-            </ToggleGroupItem>
-          </TooltipTrigger>
-          <TooltipContent side="top">Measured in {STREAM[s].rate}</TooltipContent>
-        </Tooltip>
-      ))}
-    </ToggleGroup>
-  );
-}
-
 function Kpis({ items }: { items: { label: string; value: string }[] }) {
   return (
     <div className="mb-2.5 flex gap-2">
@@ -107,6 +81,8 @@ function HistoricalProduction({ wells }: { wells: Well[] }) {
   const months = data.months.slice(a, b + 1);
   const values = data.values.map((v) => v.slice(a, b + 1));
   const title = `Historical Production by ${GROUP_LABELS[by]}`;
+  const [zoomMode, setZoomMode] = React.useState(false);
+  const zoomed = n > 0 && (a > 0 || b < n - 1);
   // The edit form works in years; the slider in months.
   const yearAt = (i: number) => keyToDate(data.months[Math.min(Math.max(0, i), n - 1)]).getFullYear();
   const firstYear = n ? yearAt(0) : 0,
@@ -131,8 +107,20 @@ function HistoricalProduction({ wells }: { wells: Well[] }) {
   };
   const chart = (big: boolean) => (
     <>
-      <StreamTabs value={stream} onChange={setStream} />
-      <StackedAreaChart months={months} groups={data.groups} values={values} unit={STREAM[stream].rate} height={big ? 380 : 190} />
+      <div className="mb-2 flex justify-end">
+        <ZoomControls active={zoomMode} zoomed={zoomed} onToggle={() => setZoomMode((z) => !z)} onReset={() => setRange([0, Math.max(0, n - 1)])} />
+      </div>
+      <StackedAreaChart
+        months={months}
+        groups={data.groups}
+        values={values}
+        unit={STREAM[stream].rate}
+        yLabel={`${stream === "oil" ? "Oil" : "Gas"} (${STREAM[stream].rate})`}
+        zoomMode={zoomMode}
+        onZoom={(i0, i1) => setRange([a + i0, a + i1])}
+        onResetZoom={() => setRange([0, Math.max(0, n - 1)])}
+        height={big ? 380 : 190}
+      />
     </>
   );
   return (
