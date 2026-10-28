@@ -12,26 +12,24 @@ const TABS: { id: InsightTab; label: string }[] = [
   { id: "rigs", label: "Rigs" },
 ];
 
-/** Pill tabs with a count badge; a tab with nothing in it is disabled. */
+/** Toggle button group of small buttons (one active) with count badges; an empty tab is disabled. */
 export function InsightTabs({ value, counts, onChange }: { value: InsightTab; counts: Record<InsightTab, number | null>; onChange: (t: InsightTab) => void }) {
   return (
-    <div role="tablist" aria-label="Insights" className="mb-3 flex gap-1">
-      {TABS.map((t) => {
+    <div role="tablist" aria-label="Insights" className="mb-3 flex overflow-hidden rounded-md border border-solid border-s-line-strong">
+      {TABS.map((t, i) => {
         const n = counts[t.id];
         const on = value === t.id;
-        const empty = n === 0;
         return (
           <button
             key={t.id}
             role="tab"
             aria-selected={on}
-            disabled={empty}
+            disabled={n === 0}
             onClick={() => onChange(t.id)}
             className={cn(
-              "inline-flex h-7 min-w-0 shrink cursor-pointer items-center gap-1 rounded-full border border-solid px-2.5 text-[11.5px] font-medium whitespace-nowrap outline-none focus-visible:ring-[3px] focus-visible:ring-primary/20 disabled:cursor-default disabled:opacity-45",
-              on
-                ? "border-primary/50 bg-[color-mix(in_srgb,var(--primary)_14%,transparent)] text-primary"
-                : "border-s-line-strong bg-s-card text-s-text hover:border-primary/40",
+              "inline-flex h-7 min-w-0 flex-auto cursor-pointer items-center justify-center gap-1 border-0 px-2 text-[11px] font-medium whitespace-nowrap outline-none focus-visible:z-[1] focus-visible:ring-[3px] focus-visible:ring-primary/20 disabled:cursor-default disabled:opacity-45",
+              i > 0 && "border-l border-solid border-s-line-strong",
+              on ? "bg-[color-mix(in_srgb,var(--primary)_14%,transparent)] text-primary" : "bg-transparent text-s-text hover:bg-s-chip",
             )}
           >
             {t.label}
