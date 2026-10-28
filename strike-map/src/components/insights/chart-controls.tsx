@@ -2,34 +2,24 @@
 
 import * as React from "react";
 import { ZoomIn, ZoomOut } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export type YScale = "linear" | "log";
 
-const seg = "flex h-6 cursor-pointer items-center border-none px-2 text-[11px] font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-primary/20";
 
-/** Linear / Semi-log toggle button group. */
+/** Linear / Semi-log as a single-select shadcn ToggleGroup (pressing the active one keeps it). */
 export function ScaleToggle({ value, onChange }: { value: YScale; onChange: (v: YScale) => void }) {
   return (
-    <div role="group" aria-label="Y-axis scale" className="inline-flex overflow-hidden rounded-md border border-s-line-strong">
-      {(
-        [
-          ["linear", "Linear"],
-          ["log", "Semi-log"],
-        ] as const
-      ).map(([v, label], i) => (
-        <button
-          key={v}
-          type="button"
-          aria-pressed={value === v}
-          onClick={() => onChange(v)}
-          className={cn(seg, i && "border-l border-solid border-s-line-strong", value === v ? "bg-s-chip text-s-text" : "bg-transparent text-s-muted hover:text-s-text")}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
+    <ToggleGroup type="single" variant="outline" size="sm" value={value} onValueChange={(v) => v && onChange(v as YScale)} aria-label="Y-axis scale">
+      <ToggleGroupItem value="linear" className="h-6 px-2 text-[11px]">
+        Linear
+      </ToggleGroupItem>
+      <ToggleGroupItem value="log" className="h-6 px-2 text-[11px]">
+        Semi-log
+      </ToggleGroupItem>
+    </ToggleGroup>
   );
 }
 

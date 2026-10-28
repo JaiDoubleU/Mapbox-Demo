@@ -6,6 +6,7 @@ import { downloadText, fileSafe } from "@/lib/download";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { dcaCsv, runDca, STREAMS, type ArpsParams, type DcaResult, type Stream } from "@/lib/dca";
 import type { ProductionMonth } from "@/lib/well-details";
@@ -82,39 +83,20 @@ function buildSeries(production: ProductionMonth[], dca: DcaResult) {
   return { rates, gor: ratio("gor"), wor: ratio("wor") };
 }
 
-/** One button in the series toggle group; its unit is in the tooltip (and accessible name). */
-function ToggleChip({
-  on,
-  label,
-  unit,
-  color,
-  first,
-  onClick,
-}: {
-  on: boolean;
-  label: string;
-  unit: string;
-  color: string;
-  first?: boolean;
-  onClick: () => void;
-}) {
+/** One item in the series ToggleGroup; its unit is in the tooltip (and accessible name). */
+function SeriesItem({ value, on, label, unit, color }: { value: Toggle; on: boolean; label: string; unit: string; color: string }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
-          type="button"
-          aria-pressed={on}
+        {/* The tooltip trigger overwrites data-state, so the pressed style keys off aria-pressed. */}
+        <ToggleGroupItem
+          value={value}
           aria-label={`${label} (${unit})`}
-          onClick={onClick}
-          className={cn(
-            "inline-flex h-7 flex-1 cursor-pointer items-center justify-center gap-1.5 border-0 px-2 text-[11px] leading-none font-medium transition-colors outline-none focus-visible:z-[1] focus-visible:ring-[3px] focus-visible:ring-primary/20",
-            !first && "border-l border-solid border-s-line-strong",
-            on ? "bg-s-chip text-s-text" : "bg-transparent text-s-muted hover:text-s-text",
-          )}
+          className="h-7 gap-1.5 px-2 text-[11px] aria-pressed:bg-accent aria-pressed:text-accent-foreground"
         >
           <span className="inline-block size-2 rounded-full border-2 border-solid" style={{ borderColor: color, background: on ? color : "transparent" }} />
           {label}
-        </button>
+        </ToggleGroupItem>
       </TooltipTrigger>
       <TooltipContent side="top">Measured in {unit}</TooltipContent>
     </Tooltip>
@@ -133,34 +115,27 @@ export function DcaForecast({ production, state, height = 180 }: { production: P
     );
   }
   // Rates toggle independently; GOR and WOR share the right axis, so turning one on turns the other off.
-  const flip = (k: Toggle) =>
-    setOn((o) => {
-      const next = { ...o, [k]: !o[k] };
-      if (next[k] && k === "gor") next.wor = false;
-      if (next[k] && k === "wor") next.gor = false;
-      return next;
-    });
+  const pressed = (Object.keys(on) as Toggle[]).filter((k) => on[k]);
+  const onSeries = (vals: string[]) => {
+    const next = Object.fromEntries((Object.keys(on) as Toggle[]).map((k) => [k, vals.includes(k)])) as Record<Toggle, boolean>;
+    // Turning one ratio on turns the other off.
+    if (next.gor && !on.gor) next.wor = false;
+    if (next.wor && !on.wor) next.gor = false;
+    setOn(next);
+  };
   const rates = series.rates.filter((s) => on[s.key as Stream]);
   const ratio = on.gor ? series.gor : on.wor ? series.wor : undefined;
   const nothing = !rates.length && !ratio;
   return (
     <div>
-      <div className="mb-2 flex overflow-hidden rounded-md border border-solid border-s-line-strong" role="group" aria-label="Series">
-        {STREAMS.map((s, i) => (
-          <ToggleChip
-            key={s}
-            first={i === 0}
-            on={on[s]}
-            label={STREAM_META[s].label}
-            unit={STREAM_META[s].rateUnit}
-            color={STREAM_META[s].color}
-            onClick={() => flip(s)}
-          />
+      <ToggleGroup type="multiple" variant="outline" size="sm" value={pressed} onValueChange={onSeries} aria-label="Series" className="mb-2 w-full">
+        {STREAMS.map((s) => (
+          <SeriesItem key={s} value={s} on={on[s]} label={STREAM_META[s].label} unit={STREAM_META[s].rateUnit} color={STREAM_META[s].color} />
         ))}
         {(["gor", "wor"] as Ratio[]).map((r) => (
-          <ToggleChip key={r} on={on[r]} label={RATIO_META[r].label} unit={RATIO_META[r].unit} color={RATIO_META[r].color} onClick={() => flip(r)} />
+          <SeriesItem key={r} value={r} on={on[r]} label={RATIO_META[r].label} unit={RATIO_META[r].unit} color={RATIO_META[r].color} />
         ))}
-      </div>
+      </ToggleGroup>
       {!nothing && <DcaChart series={rates} secondary={ratio} height={height} />}
       {nothing && <p className="m-0 py-6 text-center text-xs text-s-muted">Turn on a series to see the forecast.</p>}
       <div className="mt-1.5 flex items-center gap-3 text-[11px] text-s-muted">
