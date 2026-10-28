@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { ProductionChart } from "./production-chart";
 import { SchematicInfo, WellboreSchematic, WellboreTables } from "./wellbore-view";
 import { getWellbore } from "@/lib/wellbore";
+import { DcaForecast, ResourceEstimates, useDca } from "./dca-view";
 
 const eyebrow = "text-[11px] font-semibold tracking-[1px] text-s-muted uppercase";
 const card = "rounded-lg border border-s-line bg-s-card";
@@ -156,12 +157,10 @@ const WELL_ACTIONS = ["Evaluate this well", "View Wellbore & Completion Design",
 export function RecordDetail({
   well,
   onClose,
-  onAction,
   showDetail,
 }: {
   well: Well;
   onClose: () => void;
-  onAction: (label: string) => void;
   /** False in the collapsed phone sheet: header and tiles only. */
   showDetail: boolean;
 }) {
@@ -170,15 +169,12 @@ export function RecordDetail({
     () => getWellDetails(well, well.lateralIdx != null ? data.LATERALS[well.lateralIdx] : undefined),
     [well, data],
   );
-  const [expanded, setExpanded] = React.useState<"chart" | "timeline" | "wellbore" | null>(null);
+  const [expanded, setExpanded] = React.useState<"chart" | "timeline" | "wellbore" | "dca" | null>(null);
   // Every newly selected well opens on "Evaluate this well".
   const [view, setView] = React.useState(WELL_ACTIONS[0]);
   const wellbore = React.useMemo(() => getWellbore(well, det), [well, det]);
-  const onWellAction = (label: string) => {
-    if (label === WELL_ACTIONS[0] || label === WELL_ACTIONS[1]) setView(label);
-    else onAction(label);
-  };
-  const isWellbore = view === WELL_ACTIONS[1];
+  const dcaState = useDca(det.production);
+  const isWellbore = view === WELL_ACTIONS[1], isDca = view === WELL_ACTIONS[2];
   const isPermit = well.cat === "permit", isRig = well.cat === "rig";
   const lat = det.lateralFt ? n0(det.lateralFt) : "—";
 
@@ -236,8 +232,19 @@ export function RecordDetail({
         lines={[well.operator, `${well.api} · ${well.status} · ${well.formation}`]}
         onClose={onClose}
       />
-      {showDetail && !isPermit && !isRig && <ActionLinks links={WELL_ACTIONS} active={view} onAction={onWellAction} />}
-      {showDetail && isWellbore ? (
+      {showDetail && !isPermit && !isRig && <ActionLinks links={WELL_ACTIONS} active={view} onAction={setView} />}
+      {showDetail && isDca ? (
+        <>
+          <Section title="DCA Forecast" onExpand={dcaState.dca ? () => setExpanded("dca") : undefined}>
+            <DcaForecast production={det.production} wellName={well.name} state={dcaState} />
+          </Section>
+          {dcaState.dca && (
+            <Section title="Resource Estimates">
+              <ResourceEstimates dca={dcaState.dca} production={det.production} lateralFt={det.lateralFt} />
+            </Section>
+          )}
+        </>
+      ) : showDetail && isWellbore ? (
         <Section title="Wellbore & Completion Design" extra={<SchematicInfo />} onExpand={() => setExpanded("wellbore")}>
           <WellboreSchematic wb={wellbore} />
           <div className="mt-2">
@@ -247,7 +254,7 @@ export function RecordDetail({
       ) : (
         <KpiTiles tiles={tiles} />
       )}
-      {showDetail && !isWellbore && (
+      {showDetail && !isWellbore && !isDca && (
         <>
           {hasProduction && (
             <Section title="Production Decline" onExpand={det.production.length ? () => setExpanded("chart") : undefined}>
@@ -266,13 +273,27 @@ export function RecordDetail({
         <DialogContent className="w-[min(760px,94vw)] rounded-2xl">
           <div className="border-b border-border px-[22px] py-[18px] pr-14">
             <DialogTitle className="text-lg font-semibold">
-              {expanded === "chart" ? "Production Decline" : expanded === "wellbore" ? "Wellbore & Completion Design" : "Timeline"} ·{" "}
+              {expanded === "chart"
+                ? "Production Decline"
+                : expanded === "wellbore"
+                  ? "Wellbore & Completion Design"
+                  : expanded === "dca"
+                    ? "DCA Forecast"
+                    : "Timeline"} ·{" "}
               {well.name}
             </DialogTitle>
           </div>
           <div className="max-h-[75vh] overflow-y-auto px-[22px] py-4">
             {expanded === "chart" && <ProductionChart data={det.production} height={340} />}
             {expanded === "timeline" && <Timeline steps={det.timeline} />}
+            {expanded === "dca" && dcaState.dca && (
+              <>
+                <DcaForecast production={det.production} wellName={well.name} state={dcaState} height={340} />
+                <div className="mt-4">
+                  <ResourceEstimates dca={dcaState.dca} production={det.production} lateralFt={det.lateralFt} />
+                </div>
+              </>
+            )}
             {expanded === "wellbore" && (
               <>
                 <WellboreSchematic wb={wellbore} height={420} />

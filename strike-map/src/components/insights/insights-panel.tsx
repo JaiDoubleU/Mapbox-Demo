@@ -102,8 +102,6 @@ interface InsightsPanelProps {
   onRemoveRecord?: (idx: number) => void;
   onRemoveLease?: (idx: number) => void;
   onClearSelection?: () => void;
-  /** Short status message (toast). */
-  onNotify?: (msg: string) => void;
 }
 
 /** Right-hand panel: insights for the selection (or everything visible), plus the export flow. */
@@ -120,7 +118,6 @@ export function InsightsPanel({
   onRemoveRecord,
   onRemoveLease,
   onClearSelection,
-  onNotify,
 }: InsightsPanelProps) {
   const showDetail = !sheet || expanded;
   const d = useDataset();
@@ -296,7 +293,6 @@ export function InsightsPanel({
                 well={active.well}
                 showDetail={showDetail}
                 onClose={() => onRemoveRecord?.(active.well!.idx)}
-                onAction={(label) => onNotify?.(`${label} is coming soon`)}
               />
             ) : (
               <LeaseDetail

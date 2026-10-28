@@ -105,14 +105,17 @@ export function getWellDetails(w: Well, lateral?: Lateral, today = new Date()): 
     const months = Math.min(240, Math.round((today.getTime() - firstProd.getTime()) / (30.44 * DAY)));
     const lastMonth = w.cat === "pa" ? Math.max(3, Math.round(months * rflt(0.3, 0.8))) : months;
     let cur = monthStart(firstProd);
+    // Reported through last month; the current month isn't in yet.
+    const thisMonth = monthStart(today);
     for (let i = 0; i <= lastMonth; i++) {
       const ramp = i === 0 ? rflt(0.15, 0.4) : 1;
       const q = (qi / Math.pow(1 + b * di * i, 1 / b)) * ramp * rflt(0.9, 1.08);
-      production.push({
+      const water = rflt(0.9, 1.1);
+      if (cur < thisMonth) production.push({
         month: cur,
         oil: Math.max(0.5, q),
         gas: Math.max(0.5, (q * gor * (1 + i * 0.012)) / 1000),
-        water: Math.max(0.5, q * wor * rflt(0.9, 1.1)),
+        water: Math.max(0.5, q * wor * water),
       });
       cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
     }

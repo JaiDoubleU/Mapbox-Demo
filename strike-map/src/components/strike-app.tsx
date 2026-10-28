@@ -263,7 +263,6 @@ export function StrikeApp() {
               onRemoveRecord={(idx) => setRecordIds((ids) => ids.filter((i) => i !== idx))}
               onRemoveLease={(idx) => setLeaseIds((ids) => ids.filter((i) => i !== idx))}
               onClearSelection={clearAll}
-              onNotify={flash}
               sheet={isMobile}
               expanded={sheetExpanded}
               onToggleExpanded={() => setSheetExpanded((v) => !v)}
