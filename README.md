@@ -21,8 +21,13 @@ in their `strike-bundle.jsx` locally (don't commit it). Restrict the token to yo
 ## Deploy to Vercel
 
 **Your own repo (recommended):** in Vercel choose **Add New → Project**, import `JaiDoubleU/Mapbox-Demo`,
-set **Root Directory** to `strike-map`, add `NEXT_PUBLIC_MAPBOX_TOKEN`, and deploy. Pushes to `main` then
-deploy to production and other branches get preview URLs.
+add `NEXT_PUBLIC_MAPBOX_TOKEN`, and deploy. Pushes to `main` then deploy to production and other branches
+get preview URLs.
+
+The Root Directory can stay as the repo root: the top-level `vercel.json` builds `strike-map/` as a static
+export (`STATIC_EXPORT=1 npm run build`) and serves `strike-map/out`. If you set Root Directory to
+`strike-map` instead, Vercel ignores that file and uses `strike-map/vercel.json`, which deploys it as a
+regular Next.js app. Both work.
 
 **Deploy button:** the button above copies this repo into the clicking person's GitHub account, sets the
 root directory to `strike-map` and asks for the Mapbox token. It deploys from `main`.
