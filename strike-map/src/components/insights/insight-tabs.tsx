@@ -7,7 +7,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 export type InsightTab = "area" | "wells" | "permits" | "rigs";
 export const NO_STEP: Record<InsightTab, number> = { area: -1, wells: -1, permits: -1, rigs: -1 };
 const TABS: { id: InsightTab; label: string }[] = [
-  { id: "area", label: "Area Insights" },
+  { id: "area", label: "Insights" },
   { id: "wells", label: "Wells" },
   { id: "permits", label: "Permits" },
   { id: "rigs", label: "Rigs" },

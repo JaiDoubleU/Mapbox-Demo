@@ -96,7 +96,7 @@ export function InsightsPanel({
   const vertCount = wellsData.filter((w) => w.orientation === "Vertical").length;
   const sel = (label: string) => (hasRecordSel ? `${label} Selected` : label);
   const counts: Record<InsightTab, number | null> = { area: null, wells: wellsData.length, permits: permitsData.length, rigs: rigsData.length };
-  // An emptied tab (layer turned off, selection changed) falls back to Area Insights.
+  // An emptied tab (layer turned off, selection changed) falls back to the Insights tab.
   const tabEmpty = counts[tab] === 0;
   React.useEffect(() => {
     if (tabEmpty) setTab("area");

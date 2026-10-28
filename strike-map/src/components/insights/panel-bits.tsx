@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import type { Well } from "@/lib/strike-data";
 import { cn } from "@/lib/utils";
 
@@ -8,10 +9,12 @@ import { cn } from "@/lib/utils";
 
 export function SummaryTile({ value, label }: { value: number; label: string }) {
   return (
-    <div className="card flex-1 px-3 py-2.5">
-      <div className="text-lg leading-none font-bold text-s-text">{value.toLocaleString()}</div>
-      <div className="mt-1 text-xs text-s-muted">{label}</div>
-    </div>
+    <Card size="sm" className="min-w-0 flex-1 gap-1">
+      <CardContent>
+        <div className="text-lg leading-none font-bold text-s-text">{value.toLocaleString()}</div>
+        <div className="mt-1 text-xs text-s-muted">{label}</div>
+      </CardContent>
+    </Card>
   );
 }
 
