@@ -43,6 +43,10 @@ export interface Wellbore {
   tvdFt: number;
   lateralFt: number | null;
   casing: CasingString[];
+  /** Perforated interval (MD), when completed. */
+  perfTopMd: number | null;
+  perfBottomMd: number | null;
+  formationTops: { name: string; tvd: number }[];
   tables: DataTable[];
 }
 
@@ -130,6 +134,10 @@ export function getWellbore(w: Well, det: WellDetails): Wellbore {
   }));
 
   const n = (v: number) => Math.round(v).toLocaleString("en-US");
+  // Drawn in this order so the seeded values stay the same.
+  const perfBottomMd = completion ? mdFt - rint(50, 150) : null;
+  const tubingDepth = completion ? kop - rint(100, 400) : null;
+  const formationTops = FORMATION_TOPS.filter(([, f]) => f * tvd * 1.02 < tvd + 200).map(([name, f]) => ({ name, tvd: Math.round(f * tvd * rflt(0.97, 1.03)) }));
   const tables: DataTable[] = [
     {
       id: "completions",
@@ -145,7 +153,7 @@ export function getWellbore(w: Well, det: WellDetails): Wellbore {
         { key: "fluid", label: "Fluid (bbl)", numeric: true },
       ],
       rows: completion
-        ? [{ uwi, date: fmtDate(completion), upper: n(heelMd), lower: n(mdFt - rint(50, 150)), stages, proppant: det.proppantLbs ? n(det.proppantLbs) : "—", fluid: det.fluidBbl ? n(det.fluidBbl) : "—" }]
+        ? [{ uwi, date: fmtDate(completion), upper: n(heelMd), lower: n(perfBottomMd!), stages, proppant: det.proppantLbs ? n(det.proppantLbs) : "—", fluid: det.fluidBbl ? n(det.fluidBbl) : "—" }]
         : [],
       empty: "No completion reported yet.",
     },
@@ -173,7 +181,7 @@ export function getWellbore(w: Well, det: WellDetails): Wellbore {
         { key: "depth", label: "Set Depth (ft)", numeric: true },
         { key: "lift", label: "Artificial Lift" },
       ],
-      rows: completion ? [{ size: "2-7/8", weight: 6.5, grade: "L-80", depth: n(kop - rint(100, 400)), lift: lateral ? "Gas lift" : "Rod pump" }] : [],
+      rows: completion ? [{ size: "2-7/8", weight: 6.5, grade: "L-80", depth: n(tubingDepth!), lift: lateral ? "Gas lift" : "Rod pump" }] : [],
       empty: "No tubing reported.",
     },
     {
@@ -196,7 +204,7 @@ export function getWellbore(w: Well, det: WellDetails): Wellbore {
         { key: "formation", label: "Formation" },
         { key: "top", label: "Top TVD (ft)", numeric: true },
       ],
-      rows: FORMATION_TOPS.filter(([, f]) => f * tvd * 1.02 < tvd + 200).map(([name, f]) => ({ formation: name, top: n(f * tvd * rflt(0.97, 1.03)) })),
+      rows: formationTops.map((t) => ({ formation: t.name, top: n(t.tvd) })),
     },
     {
       id: "survey",
@@ -213,5 +221,5 @@ export function getWellbore(w: Well, det: WellDetails): Wellbore {
     },
   ];
 
-  return { path, kopFt: kop, mdFt, tvdFt: tvd, lateralFt: lateral, casing, tables };
+  return { path, kopFt: kop, mdFt, tvdFt: tvd, lateralFt: lateral, casing, perfTopMd: completion ? heelMd : null, perfBottomMd, formationTops, tables };
 }

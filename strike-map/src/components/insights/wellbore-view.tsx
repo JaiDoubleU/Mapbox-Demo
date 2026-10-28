@@ -9,8 +9,9 @@ import { cn } from "@/lib/utils";
 const n0 = (v: number) => Math.round(v).toLocaleString("en-US");
 const kLabel = (v: number) => (v === 0 ? "0" : `${Math.round(v / 1000)}k`);
 
-/* Casing strings drawn as nested outlines along the path, widest first. */
-const CASING_WIDTH: Record<string, number> = { Conductor: 24, Surface: 19, Intermediate: 14, Production: 9 };
+/* Casing strings drawn as nested pipe outlines along the path, widest first. */
+const CASING_WIDTH: Record<string, number> = { Conductor: 30, Surface: 24, Intermediate: 18, Production: 13 };
+const PIPE = "color-mix(in srgb, var(--s-text) 68%, transparent)";
 
 export function WellboreSchematic({ wb, height = 250 }: { wb: Wellbore; height?: number }) {
   const ref = React.useRef<HTMLDivElement>(null);
@@ -24,21 +25,30 @@ export function WellboreSchematic({ wb, height = 250 }: { wb: Wellbore; height?:
     return () => ro.disconnect();
   }, []);
 
-  const M = { left: 46, right: 14, top: 16, bottom: 34 };
+  // Top margin leaves room for the wellhead above surface.
+  const M = { left: 46, right: 14, top: 34, bottom: 34 };
   const iw = width - M.left - M.right, ih = height - M.top - M.bottom;
   const maxX = Math.max(1000, ...wb.path.map((p) => p.x)) * 1.05;
   const xStep = maxX > 6000 ? 1000 * Math.ceil(maxX / 9000) : 1000;
   const xMax = Math.ceil(maxX / xStep) * xStep;
   // Start a little left of zero so the wellhead clears the depth axis.
   const xMin = -xStep * 0.6;
-  const yMax = Math.ceil((wb.tvdFt + 400) / 2000) * 2000;
+  const yMax = Math.ceil((wb.tvdFt + 200) / 2000) * 2000;
   const sx = (x: number) => M.left + ((x - xMin) / (xMax - xMin)) * iw;
   const sy = (y: number) => M.top + (y / yMax) * ih;
-  const pts = (maxMd: number) =>
+  const pts = (maxMd: number, minMd = 0) =>
     wb.path
-      .filter((p) => p.md <= maxMd)
+      .filter((p) => p.md <= maxMd && p.md >= minMd)
       .map((p) => `${sx(p.x).toFixed(1)},${sy(p.tvd).toFixed(1)}`)
       .join(" ");
+  // Horizontal position of the wellbore at a depth (first crossing), for formation-top lines.
+  const xAtTvd = (tvd: number) => {
+    const i = wb.path.findIndex((p) => p.tvd >= tvd);
+    if (i <= 0) return (i === 0 ? wb.path[0] : wb.path[wb.path.length - 1]).x;
+    const a = wb.path[i - 1], b = wb.path[i];
+    return a.x + ((tvd - a.tvd) / Math.max(1e-6, b.tvd - a.tvd)) * (b.x - a.x);
+  };
+  const tops = wb.formationTops.filter((t) => t.tvd < yMax);
 
   const xTicks: number[] = [];
   for (let v = 0; v <= xMax; v += xStep) xTicks.push(v);
@@ -60,6 +70,7 @@ export function WellboreSchematic({ wb, height = 250 }: { wb: Wellbore; height?:
     setHover(bestD < 40 * 40 ? best : null);
   };
   const hp = hover != null ? wb.path[hover] : null;
+  const hoverFormation = hp ? [...tops].reverse().find((t) => t.tvd <= hp.tvd)?.name : undefined;
 
   return (
     <div ref={ref} className="relative">
@@ -73,9 +84,17 @@ export function WellboreSchematic({ wb, height = 250 }: { wb: Wellbore; height?:
         onPointerDown={onMove}
         onPointerLeave={() => setHover(null)}
       >
+        {/* formation tops: faint dotted lines from the wellbore out to the right */}
+        {tops.map((t) => {
+          const x0 = Math.min(M.left + iw, sx(xAtTvd(t.tvd)) + 18);
+          return (
+            <line key={t.name} x1={x0} x2={M.left + iw} y1={sy(t.tvd)} y2={sy(t.tvd)} stroke="var(--s-line)" strokeDasharray="2 3">
+              <title>{`${t.name} · ${n0(t.tvd)} ft TVD`}</title>
+            </line>
+          );
+        })}
         {yTicks.map((v) => (
           <g key={`y${v}`}>
-            <line x1={M.left} x2={M.left + iw} y1={sy(v)} y2={sy(v)} stroke="var(--s-line)" strokeDasharray="2 3" />
             <text x={M.left - 6} y={sy(v) + 3} textAnchor="end" fontSize={10} fill="var(--s-muted)">
               {kLabel(v)}
             </text>
@@ -99,16 +118,33 @@ export function WellboreSchematic({ wb, height = 250 }: { wb: Wellbore; height?:
           const p = pts(c.bottomMdFt);
           return (
             <g key={c.name}>
-              <polyline points={p} fill="none" stroke="var(--s-muted)" strokeWidth={wpx} strokeLinejoin="round" />
-              <polyline points={p} fill="none" stroke="var(--s-card)" strokeWidth={wpx - 2} strokeLinejoin="round" />
+              <polyline points={p} fill="none" stroke={PIPE} strokeWidth={wpx} strokeLinejoin="round" />
+              <polyline points={p} fill="none" stroke="var(--s-card)" strokeWidth={wpx - 3} strokeLinejoin="round" />
             </g>
           );
         })}
-        {/* wellbore */}
-        <polyline points={pts(Infinity)} fill="none" stroke="var(--primary)" strokeWidth={3.5} strokeLinejoin="round" strokeLinecap="round" />
-        {/* wellhead */}
-        <g stroke="var(--s-muted)" strokeWidth={1.5} fill="none">
-          <path d={`M${sx(top.x) - 14},${M.top - 2} h28 M${sx(top.x) - 10},${M.top - 8} h20 M${sx(top.x) - 6},${M.top - 8} v6 M${sx(top.x) + 6},${M.top - 8} v6`} />
+        {/* wellbore, thick along the perforated (completed) interval */}
+        <polyline points={pts(Infinity)} fill="none" stroke="var(--primary)" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+        {wb.perfTopMd != null && wb.perfBottomMd != null && (
+          <polyline points={pts(wb.perfBottomMd, wb.perfTopMd)} fill="none" stroke="var(--primary)" strokeWidth={7} strokeLinejoin="round" strokeLinecap="round">
+            <title>{`Perforated ${n0(wb.perfTopMd)}–${n0(wb.perfBottomMd)} ft MD`}</title>
+          </polyline>
+        )}
+        {/* wellhead: cap, flange and body above surface */}
+        <g stroke={PIPE} strokeWidth={1.5} fill="none" strokeLinecap="round">
+          {(() => {
+            const cx = sx(top.x), y0 = sy(0);
+            return (
+              <path
+                d={[
+                  `M${cx - 20},${y0 - 26} h40 M${cx - 20},${y0 - 30} v8 M${cx + 20},${y0 - 30} v8`,
+                  `M${cx - 6},${y0 - 26} v6 M${cx + 6},${y0 - 26} v6`,
+                  `M${cx - 15},${y0 - 20} h30 v7 h-30 z`,
+                  `M${cx - 10},${y0 - 13} v13 M${cx + 10},${y0 - 13} v13`,
+                ].join(" ")}
+              />
+            );
+          })()}
         </g>
 
         <text x={M.left + iw} y={M.top + 12} textAnchor="end" fontSize={11} fill="var(--s-text)">
@@ -133,6 +169,7 @@ export function WellboreSchematic({ wb, height = 250 }: { wb: Wellbore; height?:
           <div>MD {n0(hp.md)} ft</div>
           <div>TVD {n0(hp.tvd)} ft</div>
           <div>Inclination {hp.inc.toFixed(1)}°</div>
+          {hoverFormation && <div>Formation {hoverFormation}</div>}
         </div>
       )}
     </div>
