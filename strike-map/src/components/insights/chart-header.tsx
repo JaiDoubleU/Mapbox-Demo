@@ -47,20 +47,3 @@ export function ChartToolButtons({ title, tools }: { title: string; tools: Chart
     </div>
   );
 }
-
-/**
- * Standard header for chart containers: the chart name on the left; Edit, Export and Maximize
- * icon buttons on the right, each with a tooltip naming its action. A tool without a handler
- * stays in place but disabled, so every chart header has the same layout.
- */
-export function ChartHeader({ title, extra, tools, className }: { title: string; extra?: React.ReactNode; tools: ChartTools; className?: string }) {
-  return (
-    <div className={cn("chart-header mb-2 flex items-center justify-between border-b border-orange-500 pb-2", className)}>
-      <div className="flex min-w-0 items-center gap-1.5">
-        <h3 className="m-0 truncate text-xs font-semibold text-s-muted uppercase">{title}</h3>
-        {extra}
-      </div>
-      <ChartToolButtons title={title} tools={tools} />
-    </div>
-  );
-}

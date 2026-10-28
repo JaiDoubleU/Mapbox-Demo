@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
@@ -27,7 +26,7 @@ import { fmtK, Legend, RangePlot, StackedAreaChart, StackedBarChart, TypeCurveCh
 import { QuickInsights } from "./quick-insights";
 import { InsightCard } from "./insight-card";
 import { downloadText } from "@/lib/download";
-import { ActionLinks, card, Section } from "./record-detail";
+import { ActionLinks, card } from "./record-detail";
 
 export const WELL_AREA_ACTIONS = ["Understand Well History", "Benchmark Completions and Production", "Type Curve Creation", "Decline Curve Analysis"];
 
@@ -95,23 +94,12 @@ function Kpis({ items }: { items: { label: string; value: string }[] }) {
   );
 }
 
-/** Full-screen copy of a chart card. */
+/** A chart card that opens a full-screen copy of itself. */
 function Expandable({ title, render }: { title: string; render: (big: boolean) => React.ReactNode }) {
-  const [open, setOpen] = React.useState(false);
   return (
-    <>
-      <Section title={title} onExpand={() => setOpen(true)}>
-        {render(false)}
-      </Section>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="w-[min(960px,94vw)] rounded-2xl">
-          <div className="border-b border-border px-[22px] py-[18px] pr-14">
-            <DialogTitle className="text-lg font-semibold">{title}</DialogTitle>
-          </div>
-          <div className="max-h-[80vh] overflow-y-auto px-[22px] py-4">{render(true)}</div>
-        </DialogContent>
-      </Dialog>
-    </>
+    <InsightCard title={title} renderExpanded={() => render(true)}>
+      {render(false)}
+    </InsightCard>
   );
 }
 

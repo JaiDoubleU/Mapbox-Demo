@@ -7,32 +7,49 @@ import { ChartToolButtons } from "./chart-header";
 
 /**
  * The panel's card: shadcn Card (small) with a chart-header CardHeader (title left, tools right),
- * content, and an optional footer. Pass `onExport` and/or `renderExpanded` to get the Export and
- * Maximize tools; Maximize opens `renderExpanded()` in a dialog titled like the card.
+ * content, and an optional footer. Tools are shown when any is provided (a missing one stays
+ * disabled): Edit and Export call their handler; Maximize either calls `onMaximize`, or, with
+ * `renderExpanded`, opens that content in a dialog titled like the card.
  */
 export function InsightCard({
   title,
+  extra,
+  onEdit,
   onExport,
+  onMaximize,
   renderExpanded,
   footer,
   children,
 }: {
   title: string;
+  /** Shown beside the title (e.g. an info tooltip). */
+  extra?: React.ReactNode;
+  onEdit?: () => void;
   onExport?: () => void;
+  onMaximize?: () => void;
   renderExpanded?: () => React.ReactNode;
   footer?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = React.useState(false);
-  const hasTools = !!(onExport || renderExpanded);
+  const maximize = onMaximize ?? (renderExpanded ? () => setOpen(true) : undefined);
+  const hasTools = !!(onEdit || onExport || maximize);
+  const heading = <CardTitle className="min-w-0 truncate text-sm font-semibold whitespace-nowrap text-s-muted normal-case">{title}</CardTitle>;
   return (
     <>
-      <Card size="sm">
+      <Card size="sm" role="region" aria-label={title}>
         <CardHeader className="chart-header border-b border-orange-500">
-          <CardTitle className="min-w-0 truncate text-sm font-semibold whitespace-nowrap text-s-muted normal-case">{title}</CardTitle>
+          {extra ? (
+            <div className="flex min-w-0 items-center gap-1.5">
+              {heading}
+              {extra}
+            </div>
+          ) : (
+            heading
+          )}
           {hasTools && (
             <CardAction>
-              <ChartToolButtons title={title} tools={{ onExport, onMaximize: renderExpanded ? () => setOpen(true) : undefined }} />
+              <ChartToolButtons title={title} tools={{ onEdit, onExport, onMaximize: maximize }} />
             </CardAction>
           )}
         </CardHeader>

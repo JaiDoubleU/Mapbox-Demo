@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronLeft, ChevronRight, Maximize2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useDataset } from "@/lib/dataset-context";
 import { lngLatInPoly } from "@/lib/geo";
@@ -12,7 +12,7 @@ import { ProductionChart } from "./production-chart";
 import { SchematicInfo, WellboreSchematic, WellboreTables } from "./wellbore-view";
 import { getWellbore, type DataTable } from "@/lib/wellbore";
 import { downloadText, fileSafe } from "@/lib/download";
-import { ChartHeader, type ChartTools } from "./chart-header";
+import { InsightCard } from "./insight-card";
 import { DcaForecast, exportDcaCsv, ModifyDialog, ResourceEstimates, useDca } from "./dca-view";
 
 export const eyebrow = "text-xs font-semibold text-s-muted uppercase";
@@ -48,7 +48,17 @@ function HeaderCard({ eyebrow: kind, title, lines, onClose }: { eyebrow: string;
 }
 
 /** Well views. The active one is shown selected (green text, accent bar, tint). */
-export function ActionLinks({ links, active, onAction, label = "Well views" }: { links: string[]; active: string; onAction: (label: string) => void; label?: string }) {
+export function ActionLinks({
+  links,
+  active,
+  onAction,
+  label = "Well views",
+}: {
+  links: string[];
+  active: string;
+  onAction: (label: string) => void;
+  label?: string;
+}) {
   return (
     <div className={cn(card, "py-1.5")} role="tablist" aria-orientation="vertical" aria-label={label}>
       {links.map((l) => {
@@ -87,50 +97,6 @@ function KpiTiles({ tiles }: { tiles: { value: string; label: string }[] }) {
   );
 }
 
-/** A panel card. Chart cards pass `tools` and get the standard chart header (Edit, Export, Maximize). */
-export function Section({
-  title,
-  extra,
-  onExpand,
-  tools,
-  children,
-}: {
-  title: string;
-  extra?: React.ReactNode;
-  onExpand?: () => void;
-  tools?: ChartTools;
-  children: React.ReactNode;
-}) {
-  if (tools)
-    return (
-      <section className={cn(card, "px-3.5 py-3")} aria-label={title}>
-        <ChartHeader title={title} extra={extra} tools={tools} />
-        {children}
-      </section>
-    );
-  return (
-    <section className={cn(card, "px-3.5 py-3")}>
-      <div className="chart-header mb-2 flex items-center justify-between border-b border-orange-500 pb-2">
-        <div className="flex items-center gap-1.5">
-          <div className={eyebrow}>{title}</div>
-          {extra}
-        </div>
-        {onExpand && (
-          <button
-            onClick={onExpand}
-            title={`Expand ${title.toLowerCase()}`}
-            aria-label={`Expand ${title.toLowerCase()}`}
-            className="flex cursor-pointer rounded-sm border-none bg-transparent p-0.5 text-s-muted hover:text-s-text"
-          >
-            <Maximize2 size={13} strokeWidth={1.75} />
-          </button>
-        )}
-      </div>
-      {children}
-    </section>
-  );
-}
-
 function Timeline({ steps }: { steps: TimelineStep[] }) {
   return (
     <ol className="m-0 list-none p-0">
@@ -144,7 +110,10 @@ function Timeline({ steps }: { steps: TimelineStep[] }) {
               <span className={cn("absolute top-3 bottom-0 left-[4.5px] w-px", next?.date ? "bg-primary/60" : "bg-s-line")} aria-hidden="true" />
             )}
             <span
-              className={cn("absolute top-[5px] left-0 size-2.5 rounded-full border-2", done ? "border-primary bg-primary" : "border-s-line-strong bg-transparent")}
+              className={cn(
+                "absolute top-[5px] left-0 size-2.5 rounded-full border-2",
+                done ? "border-primary bg-primary" : "border-s-line-strong bg-transparent",
+              )}
               aria-hidden="true"
             />
             <div className="flex items-baseline justify-between gap-2">
@@ -178,13 +147,22 @@ const ym = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
 const csvCell = (v: string | number) => (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
 
 function productionCsv(name: string, production: { month: Date; oil: number; gas: number; water: number }[]) {
-  return ["well,month,oil_bbl_d,gas_mcf_d,water_bbl_d", ...production.map((p) => [name, ym(p.month), p.oil.toFixed(2), p.gas.toFixed(2), p.water.toFixed(2)].map(csvCell).join(","))].join("\n");
+  return [
+    "well,month,oil_bbl_d,gas_mcf_d,water_bbl_d",
+    ...production.map((p) => [name, ym(p.month), p.oil.toFixed(2), p.gas.toFixed(2), p.water.toFixed(2)].map(csvCell).join(",")),
+  ].join("\n");
 }
 
 /** Every wellbore table, one after another, each under its own label. */
 function wellboreCsv(name: string, tables: DataTable[]) {
   return tables
-    .map((t) => [csvCell(`${name} — ${t.label}`), t.columns.map((c) => csvCell(c.label)).join(","), ...t.rows.map((r) => t.columns.map((c) => csvCell(r[c.key] ?? "")).join(","))].join("\n"))
+    .map((t) =>
+      [
+        csvCell(`${name} — ${t.label}`),
+        t.columns.map((c) => csvCell(c.label)).join(","),
+        ...t.rows.map((r) => t.columns.map((c) => csvCell(r[c.key] ?? "")).join(",")),
+      ].join("\n"),
+    )
     .join("\n\n");
 }
 
@@ -201,143 +179,129 @@ export function RecordDetail({
   showDetail: boolean;
 }) {
   const data = useDataset();
-  const det = React.useMemo(
-    () => getWellDetails(well, well.lateralIdx != null ? data.LATERALS[well.lateralIdx] : undefined),
-    [well, data],
-  );
+  const det = React.useMemo(() => getWellDetails(well, well.lateralIdx != null ? data.LATERALS[well.lateralIdx] : undefined), [well, data]);
   const [expanded, setExpanded] = React.useState<"chart" | "timeline" | "wellbore" | "dca" | null>(null);
   // Every newly selected well opens on "Evaluate this well".
   const [view, setView] = React.useState(WELL_ACTIONS[0]);
   const wellbore = React.useMemo(() => getWellbore(well, det), [well, det]);
   const dcaState = useDca(det.production);
-  const isWellbore = view === WELL_ACTIONS[1], isDca = view === WELL_ACTIONS[2];
-  const isPermit = well.cat === "permit", isRig = well.cat === "rig";
+  const isWellbore = view === WELL_ACTIONS[1],
+    isDca = view === WELL_ACTIONS[2];
+  const isPermit = well.cat === "permit",
+    isRig = well.cat === "rig";
   const lat = det.lateralFt ? n0(det.lateralFt) : "—";
 
-  const tiles = isPermit || isRig
-    ? [
-        { value: n0(det.tvdFt), label: "Target TVD (ft)" },
-        { value: lat, label: "Planned Lateral (ft)" },
-        { value: well.county.replace(" County", ""), label: "County" },
-      ]
-    : det.lateralFt
+  const tiles =
+    isPermit || isRig
       ? [
-          { value: n1(det.oilEurPer1k!), label: "Oil EUR, WH (Mbbl/1,000 ft)" },
-          { value: n2(det.gasEurPer1k!), label: "Gas EUR, WH (Bcf/1,000 ft)" },
-          { value: lat, label: "Effective Lat Length (ft)" },
+          { value: n0(det.tvdFt), label: "Target TVD (ft)" },
+          { value: lat, label: "Planned Lateral (ft)" },
+          { value: well.county.replace(" County", ""), label: "County" },
+        ]
+      : det.lateralFt
+        ? [
+            { value: n1(det.oilEurPer1k!), label: "Oil EUR, WH (Mbbl/1,000 ft)" },
+            { value: n2(det.gasEurPer1k!), label: "Gas EUR, WH (Bcf/1,000 ft)" },
+            { value: lat, label: "Effective Lat Length (ft)" },
+          ]
+        : [
+            { value: n1(det.oilEurMbbl), label: "Oil EUR (Mbbl)" },
+            { value: n2(det.gasEurBcf), label: "Gas EUR (Bcf)" },
+            { value: n0(det.tvdFt), label: "True Vertical Depth (ft)" },
+          ];
+
+  const rows: [string, string][] =
+    isPermit || isRig
+      ? [
+          ["Operator", well.operator],
+          ["Basin", well.basin],
+          ["Field", well.field],
+          ["Target Formation", well.formation],
+          ["Target TVD (ft)", n0(det.tvdFt)],
+          ["Planned Lateral (ft)", lat],
         ]
       : [
-          { value: n1(det.oilEurMbbl), label: "Oil EUR (Mbbl)" },
-          { value: n2(det.gasEurBcf), label: "Gas EUR (Bcf)" },
-          { value: n0(det.tvdFt), label: "True Vertical Depth (ft)" },
+          ...(det.lateralFt
+            ? ([
+                ["Oil EUR, WH (Mbbl/1,000 ft)", n1(det.oilEurPer1k!)],
+                ["Gas EUR, WH (Bcf/1,000 ft)", n2(det.gasEurPer1k!)],
+              ] as [string, string][])
+            : ([
+                ["Oil EUR (Mbbl)", n1(det.oilEurMbbl)],
+                ["Gas EUR (Bcf)", n2(det.gasEurBcf)],
+              ] as [string, string][])),
+          ["Cum Oil Prod (bbl)", n0(det.cumOilBbl)],
+          ["Cum Gas Prod (Mcf)", n0(det.cumGasMcf)],
+          ...(det.lateralFt ? ([["Effective Lat Length (ft)", lat]] as [string, string][]) : []),
+          ["True Vertical Depth (ft)", n0(det.tvdFt)],
+          ["Proppant (lbs)", det.proppantLbs ? n0(det.proppantLbs) : "—"],
+          ["Total Fluid Pumped (bbl)", det.fluidBbl ? n0(det.fluidBbl) : "—"],
         ];
-
-  const rows: [string, string][] = isPermit || isRig
-    ? [
-        ["Operator", well.operator],
-        ["Basin", well.basin],
-        ["Field", well.field],
-        ["Target Formation", well.formation],
-        ["Target TVD (ft)", n0(det.tvdFt)],
-        ["Planned Lateral (ft)", lat],
-      ]
-    : [
-        ...(det.lateralFt
-          ? ([
-              ["Oil EUR, WH (Mbbl/1,000 ft)", n1(det.oilEurPer1k!)],
-              ["Gas EUR, WH (Bcf/1,000 ft)", n2(det.gasEurPer1k!)],
-            ] as [string, string][])
-          : ([
-              ["Oil EUR (Mbbl)", n1(det.oilEurMbbl)],
-              ["Gas EUR (Bcf)", n2(det.gasEurBcf)],
-            ] as [string, string][])),
-        ["Cum Oil Prod (bbl)", n0(det.cumOilBbl)],
-        ["Cum Gas Prod (Mcf)", n0(det.cumGasMcf)],
-        ...(det.lateralFt ? ([["Effective Lat Length (ft)", lat]] as [string, string][]) : []),
-        ["True Vertical Depth (ft)", n0(det.tvdFt)],
-        ["Proppant (lbs)", det.proppantLbs ? n0(det.proppantLbs) : "—"],
-        ["Total Fluid Pumped (bbl)", det.fluidBbl ? n0(det.fluidBbl) : "—"],
-      ];
 
   const hasProduction = !isPermit && !isRig;
   return (
     <div className="flex flex-col gap-2.5">
-      <HeaderCard
-        eyebrow={det.kind}
-        title={well.name}
-        lines={[well.operator, `${well.api} · ${well.status} · ${well.formation}`]}
-        onClose={onClose}
-      />
+      <HeaderCard eyebrow={det.kind} title={well.name} lines={[well.operator, `${well.api} · ${well.status} · ${well.formation}`]} onClose={onClose} />
       {showDetail && !isPermit && !isRig && <ActionLinks links={WELL_ACTIONS} active={view} onAction={setView} />}
       {showDetail && isDca ? (
         <>
-          <Section
+          <InsightCard
             title="DCA Forecast"
-            tools={
-              dcaState.dca
-                ? {
-                    onEdit: () => dcaState.setModifyOpen(true),
-                    onExport: () => exportDcaCsv(well.name, det.production, dcaState.dca!),
-                    onMaximize: () => setExpanded("dca"),
-                  }
-                : {}
-            }
+            onEdit={dcaState.dca ? () => dcaState.setModifyOpen(true) : undefined}
+            onExport={dcaState.dca ? () => exportDcaCsv(well.name, det.production, dcaState.dca!) : undefined}
+            onMaximize={dcaState.dca ? () => setExpanded("dca") : undefined}
           >
             <DcaForecast production={det.production} state={dcaState} />
-          </Section>
+          </InsightCard>
           {dcaState.dca && (
-            <Section title="Resource Estimates">
+            <InsightCard title="Resource Estimates">
               <ResourceEstimates dca={dcaState.dca} production={det.production} lateralFt={det.lateralFt} />
-            </Section>
+            </InsightCard>
           )}
         </>
       ) : showDetail && isWellbore ? (
-        <Section
+        <InsightCard
           title="Wellbore & Completion Design"
           extra={<SchematicInfo />}
-          tools={{
-            onExport: () => downloadText(`${fileSafe(well.name)}_wellbore.csv`, wellboreCsv(well.name, wellbore.tables)),
-            onMaximize: () => setExpanded("wellbore"),
-          }}
+          onExport={() => downloadText(`${fileSafe(well.name)}_wellbore.csv`, wellboreCsv(well.name, wellbore.tables))}
+          onMaximize={() => setExpanded("wellbore")}
         >
           <WellboreSchematic wb={wellbore} />
           <div className="mt-2">
             <WellboreTables tables={wellbore.tables} />
           </div>
-        </Section>
+        </InsightCard>
       ) : (
         <KpiTiles tiles={tiles} />
       )}
       {showDetail && !isWellbore && !isDca && (
         <>
           {hasProduction && (
-            <Section
+            <InsightCard
               title="Production Decline"
-              tools={
-                det.production.length
-                  ? {
-                      // Editing production means adjusting its decline forecast.
-                      onEdit: dcaState.dca
-                        ? () => {
-                            setView(WELL_ACTIONS[2]);
-                            dcaState.setModifyOpen(true);
-                          }
-                        : undefined,
-                      onExport: () => downloadText(`${fileSafe(well.name)}_production.csv`, productionCsv(well.name, det.production)),
-                      onMaximize: () => setExpanded("chart"),
+              // Editing production means adjusting its decline forecast.
+              onEdit={
+                det.production.length && dcaState.dca
+                  ? () => {
+                      setView(WELL_ACTIONS[2]);
+                      dcaState.setModifyOpen(true);
                     }
-                  : {}
+                  : undefined
               }
+              onExport={
+                det.production.length ? () => downloadText(`${fileSafe(well.name)}_production.csv`, productionCsv(well.name, det.production)) : undefined
+              }
+              onMaximize={det.production.length ? () => setExpanded("chart") : undefined}
             >
               <ProductionChart data={det.production} />
-            </Section>
+            </InsightCard>
           )}
-          <Section title="Timeline" onExpand={() => setExpanded("timeline")}>
+          <InsightCard title="Timeline" onMaximize={() => setExpanded("timeline")}>
             <Timeline steps={det.timeline} />
-          </Section>
-          <Section title={isPermit ? "Permit Details" : isRig ? "Rig Details" : "Well Metrics"}>
+          </InsightCard>
+          <InsightCard title={isPermit ? "Permit Details" : isRig ? "Rig Details" : "Well Metrics"}>
             <Metrics rows={rows} />
-          </Section>
+          </InsightCard>
         </>
       )}
       <ModifyDialog production={det.production} wellName={well.name} state={dcaState} />
@@ -398,9 +362,7 @@ export function LeaseDetail({ d, lease, onClose, showDetail }: { d: StrikeDatase
   const wells = inside.filter((w) => d.CATS[w.cat].layer === "wells").length;
   const permits = inside.filter((w) => w.cat === "permit").length;
   const rigs = inside.filter((w) => w.cat === "rig").length;
-  const ops = Object.entries(
-    inside.reduce<Record<string, number>>((m, w) => ((m[w.operator] = (m[w.operator] || 0) + 1), m), {}),
-  ).sort((a, b) => b[1] - a[1]);
+  const ops = Object.entries(inside.reduce<Record<string, number>>((m, w) => ((m[w.operator] = (m[w.operator] || 0) + 1), m), {})).sort((a, b) => b[1] - a[1]);
   return (
     <div className="flex flex-col gap-2.5">
       <HeaderCard eyebrow="Landtrac Lease" title={lease.name} lines={[lease.operator, `${lease.county} · ${lease.status}`]} onClose={onClose} />
@@ -412,7 +374,7 @@ export function LeaseDetail({ d, lease, onClose, showDetail }: { d: StrikeDatase
         ]}
       />
       {showDetail && (
-        <Section title="Lease Details">
+        <InsightCard title="Lease Details">
           <Metrics
             rows={[
               ["Lessee / Operator", lease.operator],
@@ -423,7 +385,7 @@ export function LeaseDetail({ d, lease, onClose, showDetail }: { d: StrikeDatase
               ["Top Operator in Lease", ops[0] ? `${ops[0][0]} (${ops[0][1]})` : "—"],
             ]}
           />
-        </Section>
+        </InsightCard>
       )}
     </div>
   );
@@ -432,7 +394,8 @@ export function LeaseDetail({ d, lease, onClose, showDetail }: { d: StrikeDatase
 // ---- stepper -----------------------------------------------------------------
 
 export function SelectionStepper({ index, count, onIndex, onClear }: { index: number; count: number; onIndex: (i: number) => void; onClear: () => void }) {
-  const nav = "flex size-7 cursor-pointer items-center justify-center rounded-md border border-s-line bg-s-chip text-s-text disabled:cursor-default disabled:opacity-40";
+  const nav =
+    "flex size-7 cursor-pointer items-center justify-center rounded-md border border-s-line bg-s-chip text-s-text disabled:cursor-default disabled:opacity-40";
   return (
     <div className="mb-2.5 flex items-center gap-2">
       {count > 1 && (
