@@ -12,5 +12,6 @@ Built from the Claude Design "Strike Map" prototype on the Enverus One design sy
 
 `HANDOFF.md` holds the original Claude Design handoff notes.
 
-**Mapbox token:** set `NEXT_PUBLIC_MAPBOX_TOKEN` in `strike-map/.env` (gitignored). The HTML prototypes
-take it from the Tweaks panel, or from `"token"` in `TWEAK_DEFAULTS` in their `strike-bundle.jsx`.
+**Mapbox token:** no token is committed to this repo. Set `NEXT_PUBLIC_MAPBOX_TOKEN` in `strike-map/.env`
+(gitignored). The HTML prototypes take it from their Tweaks panel, or set `"token"` in `TWEAK_DEFAULTS`
+in their `strike-bundle.jsx` locally (don't commit it). Restrict the token to your domains in your Mapbox account.
