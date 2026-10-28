@@ -94,7 +94,7 @@ export function InsightCard({
               }
             }}
             className={cn(
-              "absolute inset-y-0 right-0 z-20 flex w-[min(22rem,100%)] flex-col border-l border-border bg-card shadow-[var(--shadow-overlay)] outline-none transition-[transform,visibility] duration-200 ease-out",
+              "absolute inset-y-0 right-0 z-20 flex w-[min(22rem,100%)] flex-col border-l border-border bg-card shadow-[var(--shadow-overlay)] outline-none transition-[translate,visibility] duration-300 ease-out motion-reduce:transition-none",
               drawerOpen ? "translate-x-0 visible" : "invisible translate-x-full",
             )}
           >
