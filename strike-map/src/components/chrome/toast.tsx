@@ -26,7 +26,7 @@ export function Toast({ msg }: { msg: string | null }) {
     <div
       role="status"
       aria-live="polite"
-      className="absolute top-4 left-1/2 z-[80] rounded-[10px] bg-primary px-6 py-3.5 text-[15px] font-semibold whitespace-nowrap text-white shadow-[0_8px_32px_rgba(0,0,0,0.22)]"
+      className="absolute top-4 left-1/2 z-[80] w-max max-w-[calc(100vw-32px)] rounded-[10px] bg-primary px-6 py-3.5 text-center text-[15px] font-semibold text-white md:whitespace-nowrap shadow-[0_8px_32px_rgba(0,0,0,0.22)]"
       style={{ animation: `${closing ? "toast-slide-out" : "toast-slide-in"} 0.28s cubic-bezier(0.16,1,0.3,1) forwards` }}
     >
       {display}

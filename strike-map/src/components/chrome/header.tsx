@@ -40,13 +40,13 @@ interface HeaderProps {
 
 export function Header({ theme, onTheme, downloadCount, onDownloads, userInitials }: HeaderProps) {
   return (
-    <header className="relative z-[60] flex h-[60px] shrink-0 items-center justify-between border-b border-s-line-strong bg-s-header px-[22px]">
-      <div className="flex items-center gap-[13px]">
+    <header className="relative z-[60] flex h-14 shrink-0 items-center justify-between border-b border-s-line-strong bg-s-header px-4 md:h-[60px] md:px-[22px]">
+      <div className="flex min-w-0 items-center gap-2.5 md:gap-[13px]">
         <EnverusWordmark height={17} />
         <span className="mx-0.5 h-5 w-px bg-foreground" />
-        <span className="text-[19px] font-medium tracking-[1px] text-s-text">STRIKE</span>
+        <span className="text-base font-medium tracking-[1px] text-s-text md:text-[19px]">STRIKE</span>
       </div>
-      <div className="flex items-center justify-end gap-1.5">
+      <div className="flex shrink-0 items-center justify-end gap-1 md:gap-1.5">
         <button
           className={iconBtn}
           onClick={onDownloads}
@@ -62,7 +62,7 @@ export function Header({ theme, onTheme, downloadCount, onDownloads, userInitial
         <button className={iconBtn} onClick={onTheme} title="Toggle theme">
           {theme === "dark" ? <Moon size={19} strokeWidth={1.75} /> : <Sun size={19} strokeWidth={1.75} />}
         </button>
-        <div className="ml-1.5 flex size-[38px] items-center justify-center rounded-full bg-primary text-[13px] font-semibold text-white">
+        <div className="ml-1 flex size-9 items-center justify-center rounded-full bg-primary text-[13px] font-semibold text-white md:ml-1.5 md:size-[38px]">
           {userInitials}
         </div>
       </div>

@@ -50,50 +50,65 @@ export class CanvasMapEngine implements MapEngine {
 
   private bind() {
     const cv = this.cv;
-    let dragging = false, lastX = 0, lastY = 0, moved = 0;
+    // Pointer events cover mouse, pen and touch: one pointer pans, two pointers pinch-zoom.
+    const pointers = new Map<number, { x: number; y: number }>();
+    let moved = 0;
+    let pinchDist = 0;
+    cv.style.touchAction = "none";
+    const local = (e: { clientX: number; clientY: number }) => {
+      const r = cv.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    };
+    const pinchState = () => {
+      const [a, b] = [...pointers.values()];
+      return { mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, d: Math.hypot(a.x - b.x, a.y - b.y) };
+    };
 
-    const ro = new ResizeObserver(() => this.resize());
-    ro.observe(cv);
-    this.cleanup.push(() => ro.disconnect());
-
-    this.listen(cv, "mousedown", (e) => {
-      dragging = true;
-      moved = 0;
-      lastX = e.clientX;
-      lastY = e.clientY;
+    this.listen(cv, "pointerdown", (e) => {
+      cv.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, local(e));
+      if (pointers.size === 1) moved = 0;
+      if (pointers.size === 2) pinchDist = pinchState().d;
       cv.style.cursor = "grabbing";
     });
-    this.listen(window, "mouseup", () => {
-      dragging = false;
-      cv.style.cursor = "grab";
-    });
-    this.listen(window, "mousemove", (e) => {
-      if (!dragging) return;
-      const dx = e.clientX - lastX, dy = e.clientY - lastY;
-      moved += Math.abs(dx) + Math.abs(dy);
-      lastX = e.clientX;
-      lastY = e.clientY;
-      const sLng = this.scale * Math.cos((this.cLat * Math.PI) / 180);
-      this.cLng -= dx / sLng;
-      this.cLat += dy / this.scale;
-      this.clamp();
-      this.draw();
-    });
-    this.listen(cv, "mousemove", (e) => {
-      if (dragging) return;
-      const r = cv.getBoundingClientRect();
-      const hit = this.hitWell(e.clientX - r.left, e.clientY - r.top);
-      const ni = hit ? hit.idx : null;
-      if (ni !== this.hoverIdx) {
-        this.hoverIdx = ni;
-        cv.style.cursor = ni != null ? "pointer" : "grab";
-        this.draw();
+    const release = (e: PointerEvent) => {
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) pinchDist = 0;
+      if (!pointers.size) cv.style.cursor = "grab";
+    };
+    this.listen(cv, "pointerup", release);
+    this.listen(cv, "pointercancel", release);
+    this.listen(cv, "pointermove", (e) => {
+      const pt = local(e);
+      const prev = pointers.get(e.pointerId);
+      if (!prev) {
+        // Hover (mouse/pen only): pointer cursor and the Object Selection highlight.
+        const hit = this.hitWell(pt.x, pt.y);
+        const ni = hit ? hit.idx : null;
+        if (ni !== this.hoverIdx) {
+          this.hoverIdx = ni;
+          cv.style.cursor = ni != null ? "pointer" : "grab";
+          this.draw();
+        }
+        return;
       }
+      if (pointers.size === 2) {
+        const before = pinchState();
+        pointers.set(e.pointerId, pt);
+        const after = pinchState();
+        moved += 10; // a pinch is never a tap
+        if (pinchDist > 0 && before.d > 0) this.zoomAt(after.mid.x, after.mid.y, after.d / before.d);
+        this.panBy(after.mid.x - before.mid.x, after.mid.y - before.mid.y);
+        return;
+      }
+      const dx = pt.x - prev.x, dy = pt.y - prev.y;
+      pointers.set(e.pointerId, pt);
+      moved += Math.abs(dx) + Math.abs(dy);
+      this.panBy(dx, dy);
     });
     this.listen(cv, "click", (e) => {
       if (moved > 5) return;
-      const r = cv.getBoundingClientRect();
-      const x = e.clientX - r.left, y = e.clientY - r.top;
+      const { x, y } = local(e);
       const ctrl = e.ctrlKey || e.metaKey;
       const hit = this.hitWell(x, y);
       if (hit) return this.opts.onSelect(hit.idx, ctrl);
@@ -106,18 +121,30 @@ export class CanvasMapEngine implements MapEngine {
       "wheel",
       (e) => {
         e.preventDefault();
-        const r = cv.getBoundingClientRect();
-        const mx = e.clientX - r.left, my = e.clientY - r.top;
-        const before = this.unproject(mx, my);
-        this.scale = Math.max(900, Math.min(40000, this.scale * Math.pow(1.0015, -e.deltaY)));
-        const after = this.unproject(mx, my);
-        this.cLng += before.lng - after.lng;
-        this.cLat += before.lat - after.lat;
-        this.clamp();
-        this.draw();
+        const { x, y } = local(e);
+        this.zoomAt(x, y, Math.pow(1.0015, -e.deltaY));
       },
       { passive: false },
     );
+  }
+
+  private panBy(dx: number, dy: number) {
+    const sLng = this.scale * Math.cos((this.cLat * Math.PI) / 180);
+    this.cLng -= dx / sLng;
+    this.cLat += dy / this.scale;
+    this.clamp();
+    this.draw();
+  }
+
+  /** Zoom by `factor`, keeping the point under (mx, my) fixed. */
+  private zoomAt(mx: number, my: number, factor: number) {
+    const before = this.unproject(mx, my);
+    this.scale = Math.max(900, Math.min(40000, this.scale * factor));
+    const after = this.unproject(mx, my);
+    this.cLng += before.lng - after.lng;
+    this.cLat += before.lat - after.lat;
+    this.clamp();
+    this.draw();
   }
 
   private clamp() {

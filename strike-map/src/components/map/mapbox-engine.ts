@@ -65,6 +65,7 @@ export class MapboxMapEngine implements MapEngine {
   private styleUrl: string;
 
   private styleLoaded = false;
+  private resizeObserver: ResizeObserver;
   private failTimer: ReturnType<typeof setTimeout>;
 
   /** `onFail` fires if the first style never loads (bad token, blocked network, private style). */
@@ -97,6 +98,9 @@ export class MapboxMapEngine implements MapEngine {
       clearTimeout(this.failTimer);
       this.addLayers();
     });
+    // Follow container size changes (e.g. the mobile Insights sheet), not just window resizes.
+    this.resizeObserver = new ResizeObserver(() => this.map.resize());
+    this.resizeObserver.observe(container);
     this.map.on("click", (e) => this.onClick(e));
     this.map.on("mousemove", (e) => this.onMove(e));
   }
@@ -262,6 +266,7 @@ export class MapboxMapEngine implements MapEngine {
 
   destroy() {
     clearTimeout(this.failTimer);
+    this.resizeObserver.disconnect();
     try {
       this.map.remove();
     } catch {

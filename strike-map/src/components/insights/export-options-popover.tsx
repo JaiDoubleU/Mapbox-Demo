@@ -151,7 +151,7 @@ export function ExportOptionsPopover(props: ExportOptionsPopoverProps) {
         aria-labelledby="export-options-title"
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="fixed right-0 bottom-[76px] z-[80] flex max-h-[75vh] w-[420px] flex-col overflow-hidden rounded-t-xl border border-border bg-card shadow-[-10px_0_40px_rgba(0,0,0,0.35),0_-6px_30px_rgba(0,0,0,0.22)] outline-none"
+        className="fixed right-0 bottom-[calc(76px+env(safe-area-inset-bottom,0px))] left-0 z-[80] flex max-h-[75vh] w-full flex-col md:left-auto md:w-[420px] overflow-hidden rounded-t-xl border border-border bg-card shadow-[-10px_0_40px_rgba(0,0,0,0.35),0_-6px_30px_rgba(0,0,0,0.22)] outline-none"
         style={{ height: responsive ? "auto" : "75vh", animation: "s-popover-in 0.4s cubic-bezier(0.16,1,0.3,1)" }}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-border px-[22px] py-[18px]">

@@ -91,7 +91,7 @@ export function AISelectOverlay({ layers, density, additive, onSelectMulti }: AI
   const canSubmit = !!query.trim() && phase !== "thinking";
 
   return (
-    <div className="absolute bottom-7 left-1/2 z-[70] w-[420px] -translate-x-1/2 overflow-hidden rounded-xl border border-border bg-card shadow-[0_8px_32px_rgba(0,0,0,.22)]">
+    <div className="absolute bottom-7 left-1/2 z-[70] w-[min(420px,calc(100%-32px))] -translate-x-1/2 overflow-hidden rounded-xl border border-border bg-card shadow-[0_8px_32px_rgba(0,0,0,.22)]">
       <div className="flex items-center gap-[7px] border-b border-border px-3.5 py-[11px]">
         <Sparkles size={14} strokeWidth={1.75} color="var(--primary)" />
         <span className="text-xs font-semibold tracking-[.3px] text-s-text">AI Selection</span>

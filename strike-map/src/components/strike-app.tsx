@@ -17,6 +17,7 @@ import { MapView } from "@/components/map/map-view";
 import { TweaksPanel } from "@/components/tweaks/tweaks-panel";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useTweaks } from "@/hooks/use-tweaks";
+import { MOBILE_QUERY, useMediaQuery } from "@/hooks/use-media-query";
 import { CURRENT_USER_INITIALS, DEFAULT_DARK_STYLE, DEFAULT_LIGHT_STYLE, ENV_MAPBOX_TOKEN } from "@/lib/config";
 import { useDataset } from "@/lib/dataset-context";
 import { API_COPIED_MESSAGE, buildApiList, copyToClipboard, fmtJobTime, wellsForApiCopy } from "@/lib/format";
@@ -95,6 +96,22 @@ export function StrikeApp() {
   const setLayer = React.useCallback((key: keyof Layers, v: LayerState) => setLayers((l) => ({ ...l, [key]: v })), []);
   const [layersOpen, setLayersOpen] = React.useState(true);
   const [legendOpen, setLegendOpen] = React.useState(false);
+
+  // ---- phone layout: Insights becomes a bottom sheet; Layers starts closed.
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  const [sheetExpanded, setSheetExpanded] = React.useState(false);
+  React.useEffect(() => {
+    if (isMobile) setLayersOpen(false);
+  }, [isMobile]);
+  // On a phone the Layers panel and the Legend would overlap, so only one is open at a time.
+  const openLayers = (open: boolean) => {
+    setLayersOpen(open);
+    if (open && isMobile) setLegendOpen(false);
+  };
+  const openLegend = (open: boolean) => {
+    setLegendOpen(open);
+    if (open && isMobile) setLayersOpen(false);
+  };
 
   // ---- selection
   const [recordIds, setRecordIds] = React.useState<number[]>([]);
@@ -208,7 +225,7 @@ export function StrikeApp() {
           onDownloads={() => setHistoryOpen(true)}
           userInitials={CURRENT_USER_INITIALS}
         />
-        <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           <div className="relative min-w-0 flex-1">
             <MapView
               theme={theme}
@@ -230,12 +247,12 @@ export function StrikeApp() {
             )}
             {drawTool === "ai-select" && <AISelectOverlay layers={layers} density={tweaks.density} additive={additive} onSelectMulti={selectMany} />}
             <MapToolbar activeTool={drawTool} onTool={setDrawTool} />
-            <LayersPanel open={layersOpen} onOpen={setLayersOpen} layers={layers} setLayer={setLayer} />
-            <Legend open={legendOpen} onOpen={setLegendOpen} />
+            <LayersPanel open={layersOpen} onOpen={openLayers} layers={layers} setLayer={setLayer} />
+            <Legend open={legendOpen} onOpen={openLegend} />
             <StatusPill layers={layers} onCopyApi={(mode) => copyApi(wellsForApiCopy(d, records, layers), mode)} />
             <Toast msg={toast} />
           </div>
-          <aside id="insightsPanel" className="shrink-0" style={{ width: PANEL_W }}>
+          <aside id="insightsPanel" className="w-full shrink-0 md:w-auto" style={isMobile ? undefined : { width: PANEL_W }}>
             <InsightsPanel
               records={records}
               selectedLeaseIdxs={leaseIds}
@@ -243,6 +260,9 @@ export function StrikeApp() {
               responsiveExportDialog={tweaks.responsiveExportDialog}
               onCopyApi={copyApi}
               onExport={doExport}
+              sheet={isMobile}
+              expanded={sheetExpanded}
+              onToggleExpanded={() => setSheetExpanded((v) => !v)}
             />
           </aside>
         </div>

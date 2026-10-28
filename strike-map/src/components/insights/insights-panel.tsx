@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useDataset } from "@/lib/dataset-context";
 import type { Well } from "@/lib/strike-data";
 import type { ApiCopyMode, Layers } from "@/lib/types";
@@ -90,12 +91,27 @@ interface InsightsPanelProps {
   selectedLeaseIdxs: number[];
   layers: Layers;
   responsiveExportDialog: boolean;
+  /** Phone layout: render as a bottom sheet that shows only the summary until expanded. */
+  sheet?: boolean;
+  expanded?: boolean;
+  onToggleExpanded?: () => void;
   onCopyApi: (wells: Well[], mode: ApiCopyMode) => void;
   onExport: (summary: ExportSummary) => void;
 }
 
 /** Right-hand panel: insights for the selection (or everything visible), plus the export flow. */
-export function InsightsPanel({ records, selectedLeaseIdxs, layers, responsiveExportDialog, onCopyApi, onExport }: InsightsPanelProps) {
+export function InsightsPanel({
+  records,
+  selectedLeaseIdxs,
+  layers,
+  responsiveExportDialog,
+  onCopyApi,
+  onExport,
+  sheet = false,
+  expanded = false,
+  onToggleExpanded,
+}: InsightsPanelProps) {
+  const showDetail = !sheet || expanded;
   const d = useDataset();
   const layerOf = (w: Well) => d.CATS[w.cat].layer;
 
@@ -207,10 +223,35 @@ export function InsightsPanel({ records, selectedLeaseIdxs, layers, responsiveEx
   const copyApi = (mode: ApiCopyMode) => onCopyApi(menuOpen ? exportWells : copyApiWells, mode);
 
   return (
-    <div className="flex h-full flex-col border-l border-s-line-strong bg-s-panel">
-      <div className="flex-1 overflow-y-auto px-[18px] pt-4 pb-2">
-        <div className={cn(eyebrow, "mb-2.5")}>Explore this Area</div>
-        <div className="mb-5 flex gap-2">
+    <div
+      className={cn(
+        "flex flex-col bg-s-panel",
+        sheet
+          ? "rounded-t-xl border-t border-s-line-strong shadow-[0_-6px_24px_rgba(0,0,0,0.12)]"
+          : "h-full border-l border-s-line-strong",
+      )}
+      style={sheet && expanded ? { height: "62dvh" } : undefined}
+    >
+      <div className={cn("overflow-y-auto px-[18px]", sheet ? "pt-2" : "flex-1 pt-4 pb-2", sheet && expanded && "flex-1 pb-2")}>
+        {sheet ? (
+          <button
+            onClick={onToggleExpanded}
+            aria-expanded={expanded}
+            className="mb-2 flex w-full cursor-pointer flex-col items-center gap-2 border-none bg-transparent p-0 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
+            <span className="h-1 w-9 rounded-full bg-s-line-strong" aria-hidden="true" />
+            <span className="flex w-full items-center justify-between">
+              <span className={eyebrow}>Explore this Area</span>
+              <span className="flex items-center gap-1 text-[11px] font-medium text-s-muted">
+                {expanded ? "Less" : "More"}
+                {expanded ? <ChevronDown size={14} strokeWidth={1.75} /> : <ChevronUp size={14} strokeWidth={1.75} />}
+              </span>
+            </span>
+          </button>
+        ) : (
+          <div className={cn(eyebrow, "mb-2.5")}>Explore this Area</div>
+        )}
+        <div className={cn("flex gap-2", showDetail ? "mb-5" : "mb-1")}>
           {wellsData.length > 0 && <SummaryTile value={wellsData.length} label={sel("Wells")} />}
           {permitsData.length > 0 && <SummaryTile value={permitsData.length} label={sel("Permits")} />}
           {rigsData.length > 0 && <SummaryTile value={rigsData.length} label={sel("Active Rigs")} />}
@@ -222,7 +263,7 @@ export function InsightsPanel({ records, selectedLeaseIdxs, layers, responsiveEx
           )}
         </div>
 
-        {wellsData.length > 0 && typeEntries.length > 0 && (
+        {showDetail && wellsData.length > 0 && typeEntries.length > 0 && (
           <section className="mb-5">
             <div className={cn(eyebrow, "mb-2.5")}>Well Types</div>
             {typeEntries.map(([type, count]) => (
@@ -239,7 +280,7 @@ export function InsightsPanel({ records, selectedLeaseIdxs, layers, responsiveEx
           </section>
         )}
 
-        {topOps.length > 0 && (
+        {showDetail && topOps.length > 0 && (
           <section className="mb-5 border-t border-s-line pt-4">
             <div className={cn(eyebrow, "mb-2.5")}>Top Operators</div>
             {topOps.map(([op, count]) => (
@@ -248,7 +289,7 @@ export function InsightsPanel({ records, selectedLeaseIdxs, layers, responsiveEx
           </section>
         )}
 
-        {wellsData.length > 0 && topForms.length > 0 && (
+        {showDetail && wellsData.length > 0 && topForms.length > 0 && (
           <section className="mb-5 border-t border-s-line pt-4">
             <div className={cn(eyebrow, "mb-2.5")}>Formations</div>
             {topForms.map(([form, count]) => (
@@ -257,7 +298,7 @@ export function InsightsPanel({ records, selectedLeaseIdxs, layers, responsiveEx
           </section>
         )}
 
-        {wellsData.length > 0 && horizCount + vertCount > 0 && (
+        {showDetail && wellsData.length > 0 && horizCount + vertCount > 0 && (
           <section className="mb-2 border-t border-s-line pt-4">
             <div className={cn(eyebrow, "mb-2.5")}>Orientation</div>
             <div className="flex gap-2">
@@ -293,7 +334,12 @@ export function InsightsPanel({ records, selectedLeaseIdxs, layers, responsiveEx
         />
       )}
 
-      <div className="mt-2.5 flex items-center gap-2.5 border-t border-s-line bg-s-panel p-3.5">
+      <div
+        className={cn(
+          "flex items-center gap-2.5 border-t border-s-line bg-s-panel p-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom,0px))]",
+          sheet ? "mt-1" : "mt-2.5",
+        )}
+      >
         <button
           onClick={() => (menuOpen ? closeMenu() : openMenu())}
           aria-expanded={menuOpen}

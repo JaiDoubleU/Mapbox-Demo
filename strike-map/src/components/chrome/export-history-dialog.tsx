@@ -120,15 +120,20 @@ export function ExportHistoryDialog({ open, onOpenChange, jobs, onDownload, onDe
             {jobs.map((job, i) => (
               <div
                 key={job.id}
-                className={cn("flex items-center gap-3.5 px-[22px] py-3", i !== jobs.length - 1 && "border-b border-border")}
+                className={cn("flex items-center gap-3 px-4 py-3 md:gap-3.5 md:px-[22px]", i !== jobs.length - 1 && "border-b border-border")}
               >
                 <RowIconButton icon={Download} title="Download" loading={!!busy[job.id]} onClick={() => download(job)} />
                 <div className="min-w-0 flex-[2]">
                   <JobName name={job.name} onRename={(name) => onRename(job.id, name)} />
                   <div className="mt-0.5 text-[12.5px] text-s-muted">{job.details}</div>
+                  {/* Phones: date and status move under the details. */}
+                  <div className="mt-0.5 flex flex-wrap gap-x-2 text-[12.5px] md:hidden">
+                    <span className="text-s-text">{job.time}</span>
+                    <span className="text-[11px] leading-[19px] font-bold tracking-[.3px] text-primary">{job.status}</span>
+                  </div>
                 </div>
-                <div className="min-w-0 flex-[1.3] text-[12.5px] text-s-text">{job.time}</div>
-                <span className="w-[92px] shrink-0 text-[11px] font-bold tracking-[.3px] text-primary">{job.status}</span>
+                <div className="hidden min-w-0 flex-[1.3] text-[12.5px] text-s-text md:block">{job.time}</div>
+                <span className="hidden w-[92px] shrink-0 text-[11px] font-bold tracking-[.3px] text-primary md:inline">{job.status}</span>
                 <RowIconButton icon={Trash2} title="Delete" danger onClick={() => onDelete(job.id)} />
               </div>
             ))}
