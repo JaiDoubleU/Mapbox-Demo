@@ -24,7 +24,7 @@ import {
 import { useDataset } from "@/lib/dataset-context";
 import type { Well } from "@/lib/strike-data";
 import { cn } from "@/lib/utils";
-import { fmtK, Legend, RangePlot, StackedAreaChart, StackedBarChart, TypeCurveChart } from "./area-charts";
+import { fmtK, Legend, RangePlot, StackedAreaChart, StackedBarChart } from "./area-charts";
 import { QuickInsights } from "./quick-insights";
 import { DcaChart, elapsedDate, type DcaSeries } from "./dca-chart";
 import { EditorActions, FieldRow, GroupLabel, NumberField, SelectField, SwitchField } from "./card-editor";
@@ -32,7 +32,7 @@ import { InsightCard } from "./insight-card";
 import { downloadText } from "@/lib/download";
 import { ActionLinks, card } from "./record-detail";
 
-export const WELL_AREA_ACTIONS = ["Understand Well History", "Benchmark Completions and Production", "Type Curve Creation", "Decline Curve Analysis"];
+export const WELL_AREA_ACTIONS = ["Understand Well History", "Benchmark Completions and Production", "Decline Curve Analysis"];
 
 const STREAM: Record<Stream, { label: string; rate: string; vol: string; volDiv: number; color: string }> = {
   oil: { label: "Oil Production", rate: "BBL/D", vol: "Mbbl", volDiv: 1e3, color: "var(--chart-oil)" },
@@ -387,80 +387,6 @@ function Benchmarks({ wells }: { wells: Well[] }) {
 
 // ---- Type curve & decline analysis -----------------------------------------------
 
-function CurveControls({
-  stream,
-  setStream,
-  normalize,
-  setNormalize,
-  normalizeFt,
-}: {
-  stream: Stream;
-  setStream: (s: Stream) => void;
-  normalize: boolean;
-  setNormalize: (v: boolean) => void;
-  normalizeFt: number;
-}) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <StreamTabs value={stream} onChange={setStream} />
-      <label className="mb-2 flex items-center gap-1.5 text-xs text-s-text">
-        <Switch checked={normalize} onCheckedChange={setNormalize} aria-label={`Normalize to ${normalizeFt.toLocaleString("en-US")} ft lateral`} />
-        Normalize to {ftLabel(normalizeFt)} ft
-      </label>
-    </div>
-  );
-}
-
-function TypeCurveView({ wells, stream, setStream, normalize, setNormalize, normalizeFt, setNormalizeFt }: CurveProps) {
-  const d = useDataset();
-  const curve = React.useMemo(() => typeCurve(d, wells, stream, normalize ? normalizeFt : null), [d, wells, stream, normalize, normalizeFt]);
-  const s = STREAM[stream];
-  const peak = curve.points.length ? Math.max(...curve.points.map((p) => p.p50)) : 0;
-  const cum12 = curve.points.slice(0, 12).reduce((sum, p) => sum + p.p50 * 30.44, 0);
-  const body = (big: boolean) => (
-    <>
-      <CurveControls stream={stream} setStream={setStream} normalize={normalize} setNormalize={setNormalize} normalizeFt={normalizeFt} />
-      <Kpis
-        items={[
-          { label: "Wells", value: curve.wells.toLocaleString("en-US") },
-          { label: `P50 Peak (${s.rate.toLowerCase()})`, value: fmtK(peak) },
-          { label: `P50 First 12 Mo (${s.vol})`, value: fmtNum(cum12 / s.volDiv, 1) },
-        ]}
-      />
-      <TypeCurveChart points={curve.points} color={s.color} unit={s.rate} height={big ? 380 : 200} />
-    </>
-  );
-  return (
-    <Expandable
-      title="Type Curve"
-      render={body}
-      editor={(close) => (
-        <>
-          <SelectField
-            label="Stream"
-            value={stream}
-            options={[
-              ["oil", "Oil (BBL/d)"],
-              ["gas", "Gas (MCF/d)"],
-            ]}
-            onChange={setStream}
-          />
-          <SwitchField label="Normalize to a lateral length" checked={normalize} onChange={setNormalize} />
-          <NumberField label="Normalized lateral length (ft)" integer min={1000} max={30000} value={normalizeFt} onCommit={setNormalizeFt} />
-          <EditorActions
-            onReset={() => {
-              setStream("oil");
-              setNormalize(true);
-              setNormalizeFt(DEFAULT_NORMALIZE_FT);
-            }}
-            onDone={close}
-          />
-        </>
-      )}
-    />
-  );
-}
-
 type DeclineToggle = "oil" | "gas" | "water" | "gor" | "wor";
 const DECLINE_ITEMS: { key: DeclineToggle; label: string; unit: string; color: string }[] = [
   { key: "oil", label: "Oil", unit: "BBL/d", color: "var(--chart-oil)" },
@@ -495,7 +421,13 @@ function DeclineView({
   setNormalize,
   normalizeFt,
   setNormalizeFt,
-}: Pick<CurveProps, "wells" | "normalize" | "setNormalize" | "normalizeFt" | "setNormalizeFt">) {
+}: {
+  wells: Well[];
+  normalize: boolean;
+  setNormalize: (v: boolean) => void;
+  normalizeFt: number;
+  setNormalizeFt: (v: number) => void;
+}) {
   const d = useDataset();
   // Oil, gas and water each toggle on their own; GOR and WOR each add a log axis on the right.
   const [on, setOn] = React.useState<DeclineToggle[]>(["oil", "gas", "water"]);
@@ -680,25 +612,13 @@ function DeclineView({
   );
 }
 
-interface CurveProps {
-  wells: Well[];
-  stream: Stream;
-  setStream: (s: Stream) => void;
-  normalize: boolean;
-  setNormalize: (v: boolean) => void;
-  normalizeFt: number;
-  setNormalizeFt: (v: number) => void;
-}
-
 // ---- tab ---------------------------------------------------------------------------
 
 /** Wells tab: the four area workflows over `wells` (the selection, or everything visible). */
 export function WellsInsights({ wells }: { wells: Well[] }) {
   const [view, setView] = React.useState(WELL_AREA_ACTIONS[0]);
-  const [stream, setStream] = React.useState<Stream>("oil");
   const [normalize, setNormalize] = React.useState(true);
   const [normalizeFt, setNormalizeFt] = React.useState(DEFAULT_NORMALIZE_FT);
-  const curve = { wells, stream, setStream, normalize, setNormalize, normalizeFt, setNormalizeFt };
   return (
     <div className="flex flex-col gap-2.5">
       <ActionLinks links={WELL_AREA_ACTIONS} active={view} onAction={setView} label="Well workflows" />
@@ -708,8 +628,6 @@ export function WellsInsights({ wells }: { wells: Well[] }) {
         <WellHistory wells={wells} />
       ) : view === WELL_AREA_ACTIONS[1] ? (
         <Benchmarks wells={wells} />
-      ) : view === WELL_AREA_ACTIONS[2] ? (
-        <TypeCurveView {...curve} />
       ) : (
         <DeclineView wells={wells} normalize={normalize} setNormalize={setNormalize} normalizeFt={normalizeFt} setNormalizeFt={setNormalizeFt} />
       )}

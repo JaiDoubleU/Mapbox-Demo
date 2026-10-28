@@ -168,7 +168,7 @@ function wellboreCsv(name: string, tables: DataTable[]) {
     .join("\n\n");
 }
 
-const WELL_ACTIONS = ["Evaluate this well", "View Wellbore & Completion Design", "Generate Decline Curve Analysis"];
+const WELL_ACTIONS = ["Understand this Well", "View Wellbore & Completion Design", "Generate Decline Curve Analysis"];
 
 export function RecordDetail({
   well,
@@ -183,7 +183,7 @@ export function RecordDetail({
   const data = useDataset();
   const det = React.useMemo(() => getWellDetails(well, well.lateralIdx != null ? data.LATERALS[well.lateralIdx] : undefined), [well, data]);
   const [expanded, setExpanded] = React.useState<"chart" | "timeline" | "wellbore" | "dca" | null>(null);
-  // Every newly selected well opens on "Evaluate this well".
+  // Every newly selected well opens on "Understand this Well".
   const [view, setView] = React.useState(WELL_ACTIONS[0]);
   const wellbore = React.useMemo(() => getWellbore(well, det), [well, det]);
   const dcaState = useDca(det.production);
