@@ -200,7 +200,7 @@ export function ExportOptionsPopover(props: ExportOptionsPopoverProps) {
                   <div className="flex items-center gap-2">
                     <CollapsibleTrigger
                       onClick={(e) => e.stopPropagation()}
-                      className="cursor-pointer rounded-sm border-none bg-transparent p-0 text-xs font-semibold tracking-[1px] text-s-text uppercase outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      className="cursor-pointer rounded-sm border-none bg-transparent p-0 text-xs font-semibold text-s-text uppercase outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                     >
                       {s.title}
                     </CollapsibleTrigger>

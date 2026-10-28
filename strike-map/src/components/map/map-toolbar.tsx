@@ -107,7 +107,7 @@ export function MapToolbar({ activeTool, onTool }: MapToolbarProps) {
           alignOffset={-5}
           className="min-w-[205px] rounded-[10px] bg-card px-0 py-1 shadow-[0_4px_24px_rgba(0,0,0,.22)]"
         >
-          <DropdownMenuLabel className="px-3.5 pt-2 pb-1.5 text-[10px] font-bold tracking-[1px] text-s-muted uppercase">
+          <DropdownMenuLabel className="px-3.5 pt-2 pb-1.5 text-[10px] font-bold text-s-muted uppercase">
             Selection Tools
           </DropdownMenuLabel>
           {SELECTION_TOOLS.map((tool) => {

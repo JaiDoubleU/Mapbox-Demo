@@ -26,7 +26,7 @@ export function ChartHeader({ title, extra, tools, className }: { title: string;
   return (
     <div className={cn("mb-2 flex items-center justify-between gap-2", className)}>
       <div className="flex min-w-0 items-center gap-1.5">
-        <h3 className="m-0 truncate text-[11px] font-semibold tracking-[1px] text-s-muted uppercase">{title}</h3>
+        <h3 className="m-0 truncate text-[11px] font-semibold text-s-muted uppercase">{title}</h3>
         {extra}
       </div>
       <div className="-mr-1 flex shrink-0 items-center gap-0.5" role="toolbar" aria-label={`${title} tools`}>

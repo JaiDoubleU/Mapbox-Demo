@@ -44,7 +44,7 @@ export function Header({ theme, onTheme, downloadCount, onDownloads, userInitial
       <div className="flex min-w-0 items-center gap-2.5 md:gap-[13px]">
         <EnverusWordmark height={17} />
         <span className="mx-0.5 h-5 w-px bg-foreground" />
-        <span className="text-base font-medium tracking-[1px] text-s-text md:text-[19px]">STRIKE</span>
+        <span className="text-base font-medium text-s-text md:text-[19px]">STRIKE</span>
       </div>
       <div className="flex shrink-0 items-center justify-end gap-1 md:gap-1.5">
         <button

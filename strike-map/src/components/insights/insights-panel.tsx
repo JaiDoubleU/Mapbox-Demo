@@ -25,7 +25,7 @@ const TYPE_COLORS: Record<string, string> = {
   "Plugged & Abandoned": "#b9c0c7",
 };
 
-const eyebrow = "text-[11px] font-semibold tracking-[1px] text-s-muted uppercase";
+const eyebrow = "text-[11px] font-semibold text-s-muted uppercase";
 
 function SummaryTile({ value, label }: { value: number; label: string }) {
   return (

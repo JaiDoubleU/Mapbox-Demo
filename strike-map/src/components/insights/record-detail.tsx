@@ -15,7 +15,7 @@ import { downloadText, fileSafe } from "@/lib/download";
 import { ChartHeader, type ChartTools } from "./chart-header";
 import { DcaForecast, exportDcaCsv, ModifyDialog, ResourceEstimates, useDca } from "./dca-view";
 
-const eyebrow = "text-[11px] font-semibold tracking-[1px] text-s-muted uppercase";
+const eyebrow = "text-[11px] font-semibold text-s-muted uppercase";
 const card = "rounded-lg border border-s-line bg-s-card";
 const n0 = (v: number) => Math.round(v).toLocaleString("en-US");
 const n1 = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });

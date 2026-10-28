@@ -334,7 +334,7 @@ export function ResourceEstimates({ dca, production, lateralFt }: { dca: DcaResu
             <th className="pb-1.5 text-left" />
             {STREAMS.map((s) => (
               <th key={s} className="pb-1.5 text-right font-semibold">
-                <div className="text-[11px] tracking-[1px] uppercase" style={{ color: STREAM_META[s].color }}>
+                <div className="text-[11px] uppercase" style={{ color: STREAM_META[s].color }}>
                   {STREAM_META[s].label}
                 </div>
                 <div className="text-[10px] font-normal text-s-muted">{STREAM_META[s].volUnit}</div>
