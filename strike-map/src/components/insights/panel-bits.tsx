@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 export function SummaryTile({ value, label }: { value: number; label: string }) {
   return (
     <div className="card flex-1 px-3 py-2.5">
-      <div className="text-xl leading-none font-bold text-s-text">{value.toLocaleString()}</div>
+      <div className="text-lg leading-none font-bold text-s-text">{value.toLocaleString()}</div>
       <div className="mt-1 text-xs text-s-muted">{label}</div>
     </div>
   );
