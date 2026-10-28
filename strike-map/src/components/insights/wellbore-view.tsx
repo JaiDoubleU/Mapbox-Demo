@@ -318,8 +318,9 @@ export function WellboreTables({ tables, maxRows }: { tables: DataTable[]; maxRo
       </div>
 
       <div
-        className={cn("overflow-x-auto", scroll ? "overflow-y-auto overscroll-contain" : "min-h-[170px]")}
-        style={scroll ? { maxHeight: ROW_PX * (maxRows + 1) + 1 } : undefined}
+        className={cn("overflow-x-auto", scroll ? "mt-2 overflow-y-auto overscroll-contain rounded-md border border-s-line" : "min-h-[170px]")}
+        // Fixed height (header + maxRows rows, plus the border) so switching tabs never resizes the dialog.
+        style={scroll ? { height: ROW_PX * (maxRows + 1) + 3 } : undefined}
         role="tabpanel"
       >
         {/* Separate borders in scroll mode: collapsed borders paint over a sticky header. */}
