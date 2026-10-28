@@ -2,6 +2,7 @@ import type mapboxgl from "mapbox-gl";
 import type { Map as MapboxMap, MapMouseEvent } from "mapbox-gl";
 import type { Pt } from "@/lib/geo";
 import type { StrikeDataset } from "@/lib/strike-data";
+import { rigIconImage } from "@/lib/rig-icon";
 import { HOVER_PINK, LEASE_COLOR, isInteractive, type EngineOptions, type MapEngine } from "./engine";
 
 type MapboxModule = typeof mapboxgl;
@@ -55,7 +56,11 @@ function gridGeoJSON(d: StrikeDataset): GeoJSON.FeatureCollection {
   };
 }
 
-const LAYER_IDS = ["grid", "laterals-sel", "laterals", "leases-fill", "leases-sel-fill", "leases-line", "leases-sel", "wells", "wells-sel", "wells-hover"];
+const LAYER_IDS = ["grid", "laterals-sel", "laterals", "leases-fill", "leases-sel-fill", "leases-line", "leases-sel", "wells", "rigs", "wells-sel", "wells-hover"];
+const RIG_IMAGE = "strike-rig";
+/** Rigs draw as the derrick icon on their own symbol layer; every other record is a circle. */
+const NOT_RIG = ["!=", ["get", "cat"], "rig"];
+const IS_RIG = ["==", ["get", "cat"], "rig"];
 
 /** Mapbox GL renderer. Mirrors the canvas engine's look and interaction rules. */
 export class MapboxMapEngine implements MapEngine {
@@ -119,6 +124,12 @@ export class MapboxMapEngine implements MapEngine {
     return ["interpolate", ["linear"], ["zoom"], 8, 2, 12, r, 15, r + 3];
   }
 
+  /** Rig icon scale: 1 = 20px at the default dot size, following the dots' zoom ramp. */
+  private rigSize(): mapboxgl.ExpressionSpecification {
+    const r = this.opts.tweaks.dotSize || 4;
+    return ["interpolate", ["linear"], ["zoom"], 8, 0.55, 12, r / 4, 15, (r + 3) / 4];
+  }
+
   private addLayers() {
     const map = this.map, d = this.opts.data;
     if (map.getSource("wells")) return;
@@ -144,6 +155,12 @@ export class MapboxMapEngine implements MapEngine {
 
     map.addSource("wells", { type: "geojson", data: wellsGeoJSON(d) });
     map.addLayer({ id: "wells", type: "circle", source: "wells", paint: { "circle-radius": this.dotRadius(), "circle-color": ["get", "color"] } });
+    // The image is registered at 20 CSS px (2× pixels); icon-size scales it with zoom like the dots.
+    if (!map.hasImage(RIG_IMAGE)) map.addImage(RIG_IMAGE, rigIconImage(20, 2), { pixelRatio: 2 });
+    map.addLayer({
+      id: "rigs", type: "symbol", source: "wells", filter: IS_RIG as mapboxgl.FilterSpecification,
+      layout: { "icon-image": RIG_IMAGE, "icon-size": this.rigSize(), "icon-allow-overlap": true, "icon-ignore-placement": true },
+    });
     map.addLayer({
       id: "wells-sel", type: "circle", source: "wells", filter: NONE as mapboxgl.FilterSpecification,
       paint: { "circle-radius": r + 7, "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#fff", "circle-stroke-width": 2 },
@@ -175,7 +192,10 @@ export class MapboxMapEngine implements MapEngine {
     const r = tw.dotSize || 4;
     const filters: unknown[] = ["all", this.layerFilter()];
     if (tw.density < 1) filters.push(["<", ["%", ["get", "idx"], 1000], tw.density * 1000]);
-    map.setFilter("wells", filters as mapboxgl.FilterSpecification);
+    map.setFilter("wells", [...filters, NOT_RIG] as mapboxgl.FilterSpecification);
+    map.setFilter("rigs", [...filters, IS_RIG] as mapboxgl.FilterSpecification);
+    map.setLayoutProperty("rigs", "icon-size", this.rigSize());
+    map.setPaintProperty("rigs", "icon-opacity", L.rigs === "view" ? 0.65 : 1);
     map.setPaintProperty("wells", "circle-radius", this.dotRadius());
     map.setPaintProperty("wells-sel", "circle-radius", r + 7);
     map.setPaintProperty("wells-hover", "circle-radius", r + 5);
@@ -209,7 +229,8 @@ export class MapboxMapEngine implements MapEngine {
 
   private interactiveWellAt(e: MapMouseEvent): number | null {
     if (!this.ready()) return null;
-    const hits = this.map.queryRenderedFeatures(e.point, { layers: ["wells"] });
+    // Rigs first: their icons sit on top of the dots.
+    const hits = this.map.queryRenderedFeatures(e.point, { layers: ["rigs", "wells"] });
     const hit = hits.find((f) => isInteractive(this.opts.layers, f.properties?.layer));
     if (hit) return hit.properties!.idx as number;
     // Laterals are thin, so accept clicks within 5px of the line.

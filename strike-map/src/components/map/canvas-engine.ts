@@ -1,5 +1,6 @@
 import { BASEMAP_IMAGES } from "@/lib/basemap-images";
 import { distToSegment, pointInPoly, type Pt } from "@/lib/geo";
+import { drawRigIcon, rigIconPx } from "@/lib/rig-icon";
 import type { Lease, Well } from "@/lib/strike-data";
 import {
   CANVAS_PALETTES,
@@ -178,12 +179,14 @@ export class CanvasMapEngine implements MapEngine {
     const { data: d, layers, tweaks } = this.opts;
     const rad = (tweaks.dotSize || 4) + 5;
     let best: Well | null = null, bestD = rad * rad;
+    const rigBonus = Math.max(0, (rigIconPx(tweaks.dotSize || 4) / 2 + 2) ** 2 - rad * rad);
     for (const w of d.WELLS) {
       if (!isInteractive(layers, d.CATS[w.cat].layer)) continue;
       if (!passesDensity(w.idx, tweaks.density)) continue;
       const p = this.project(w.lng, w.lat);
       if (p.x < -10 || p.x > this.W + 10 || p.y < -10 || p.y > this.H + 10) continue;
-      const dd = (p.x - x) ** 2 + (p.y - y) ** 2;
+      // The rig icon is larger than a dot, so its hit area is too (and it wins ties, being on top).
+      const dd = (p.x - x) ** 2 + (p.y - y) ** 2 - (w.cat === "rig" ? rigBonus : 0);
       if (dd < bestD) {
         bestD = dd;
         best = w;
@@ -357,16 +360,28 @@ export class CanvasMapEngine implements MapEngine {
       ctx.globalAlpha = 1;
     }
 
-    // well dots
+    // well dots; active rigs are drawn afterwards as the derrick icon, on top
+    const rigs: Well[] = [];
     for (const w of d.WELLS) {
       if (!passesDensity(w.idx, tw.density) || !visible(w)) continue;
+      if (w.cat === "rig") {
+        rigs.push(w);
+        continue;
+      }
       const p = this.project(w.lng, w.lat);
       if (p.x < -8 || p.x > this.W + 8 || p.y < -8 || p.y > this.H + 8) continue;
       ctx.globalAlpha = layers[d.CATS[w.cat].layer] === "view" ? 0.65 : 1;
       ctx.fillStyle = d.CATS[w.cat].color;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, w.cat === "rig" ? r + 1.5 : r, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
       ctx.fill();
+    }
+    const rigPx = rigIconPx(r);
+    ctx.globalAlpha = layers.rigs === "view" ? 0.65 : 1;
+    for (const w of rigs) {
+      const p = this.project(w.lng, w.lat);
+      if (p.x < -rigPx || p.x > this.W + rigPx || p.y < -rigPx || p.y > this.H + rigPx) continue;
+      drawRigIcon(ctx, p.x, p.y, rigPx);
     }
     ctx.globalAlpha = 1;
 
@@ -398,14 +413,16 @@ export class CanvasMapEngine implements MapEngine {
       const w = d.WELLS[selIdx];
       if (!w || !visible(w)) return;
       const p = this.project(w.lng, w.lat);
+      // Rings clear the rig icon, which is larger than a dot.
+      const ring = w.cat === "rig" ? rigIconPx(r) / 2 + 3 : r + 6;
       ctx.lineWidth = 2;
       ctx.strokeStyle = "#fff";
       ctx.beginPath();
-      ctx.arc(p.x, p.y, r + 6, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, ring, 0, Math.PI * 2);
       ctx.stroke();
       ctx.strokeStyle = d.CATS[w.cat].color;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, r + 9, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, ring + 3, 0, Math.PI * 2);
       ctx.stroke();
     });
 
