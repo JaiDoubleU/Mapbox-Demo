@@ -24,7 +24,7 @@ const TOOLS: { key: keyof ChartTools; label: string; icon: LucideIcon }[] = [
  */
 export function ChartHeader({ title, extra, tools, className }: { title: string; extra?: React.ReactNode; tools: ChartTools; className?: string }) {
   return (
-    <div className={cn("flex items-center justify-between pb-2", className)}>
+    <div className={cn("chart-header flex items-center justify-between border-b border-orange-500 pb-2", className)}>
       <div className="flex min-w-0 items-center gap-1.5">
         <h3 className="m-0 truncate text-[11px] font-semibold text-s-muted uppercase">{title}</h3>
         {extra}
