@@ -9,6 +9,8 @@ import type { Lease, StrikeDataset, Well } from "@/lib/strike-data";
 import { fmtDate, gapLabel, getWellDetails, type TimelineStep } from "@/lib/well-details";
 import { cn } from "@/lib/utils";
 import { ProductionChart } from "./production-chart";
+import { SchematicInfo, WellboreSchematic, WellboreTables } from "./wellbore-view";
+import { getWellbore } from "@/lib/wellbore";
 
 const eyebrow = "text-[11px] font-semibold tracking-[1px] text-s-muted uppercase";
 const card = "rounded-lg border border-s-line bg-s-card";
@@ -42,18 +44,29 @@ function HeaderCard({ eyebrow: kind, title, lines, onClose }: { eyebrow: string;
   );
 }
 
-function ActionLinks({ links, onAction }: { links: string[]; onAction: (label: string) => void }) {
+/** Well views. The active one is shown selected (green text, accent bar, tint). */
+function ActionLinks({ links, active, onAction }: { links: string[]; active: string; onAction: (label: string) => void }) {
   return (
-    <div className={cn(card, "py-1.5")}>
-      {links.map((l) => (
-        <button
-          key={l}
-          onClick={() => onAction(l)}
-          className="block w-full cursor-pointer border-y-0 border-r-0 border-l-[3px] border-solid border-transparent bg-transparent px-3 py-1.5 text-left text-[13px] text-s-text outline-none hover:border-primary hover:bg-[color-mix(in_srgb,var(--primary)_10%,transparent)] hover:text-primary focus-visible:border-primary focus-visible:text-primary"
-        >
-          {l}
-        </button>
-      ))}
+    <div className={cn(card, "py-1.5")} role="tablist" aria-orientation="vertical" aria-label="Well views">
+      {links.map((l) => {
+        const on = l === active;
+        return (
+          <button
+            key={l}
+            role="tab"
+            aria-selected={on}
+            onClick={() => onAction(l)}
+            className={cn(
+              "block w-full cursor-pointer border-y-0 border-r-0 border-l-[3px] border-solid bg-transparent px-3 py-1.5 text-left text-[13px] outline-none hover:text-primary focus-visible:text-primary",
+              on
+                ? "border-primary bg-[color-mix(in_srgb,var(--primary)_10%,transparent)] font-medium text-primary"
+                : "border-transparent text-s-text hover:bg-[color-mix(in_srgb,var(--primary)_6%,transparent)]",
+            )}
+          >
+            {l}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -71,11 +84,14 @@ function KpiTiles({ tiles }: { tiles: { value: string; label: string }[] }) {
   );
 }
 
-function Section({ title, onExpand, children }: { title: string; onExpand?: () => void; children: React.ReactNode }) {
+function Section({ title, extra, onExpand, children }: { title: string; extra?: React.ReactNode; onExpand?: () => void; children: React.ReactNode }) {
   return (
     <section className={cn(card, "px-3.5 py-3")}>
       <div className="mb-2 flex items-center justify-between">
-        <div className={eyebrow}>{title}</div>
+        <div className="flex items-center gap-1.5">
+          <div className={eyebrow}>{title}</div>
+          {extra}
+        </div>
         {onExpand && (
           <button
             onClick={onExpand}
@@ -154,7 +170,15 @@ export function RecordDetail({
     () => getWellDetails(well, well.lateralIdx != null ? data.LATERALS[well.lateralIdx] : undefined),
     [well, data],
   );
-  const [expanded, setExpanded] = React.useState<"chart" | "timeline" | null>(null);
+  const [expanded, setExpanded] = React.useState<"chart" | "timeline" | "wellbore" | null>(null);
+  // Every newly selected well opens on "Evaluate this well".
+  const [view, setView] = React.useState(WELL_ACTIONS[0]);
+  const wellbore = React.useMemo(() => getWellbore(well, det), [well, det]);
+  const onWellAction = (label: string) => {
+    if (label === WELL_ACTIONS[0] || label === WELL_ACTIONS[1]) setView(label);
+    else onAction(label);
+  };
+  const isWellbore = view === WELL_ACTIONS[1];
   const isPermit = well.cat === "permit", isRig = well.cat === "rig";
   const lat = det.lateralFt ? n0(det.lateralFt) : "—";
 
@@ -212,9 +236,18 @@ export function RecordDetail({
         lines={[well.operator, `${well.api} · ${well.status} · ${well.formation}`]}
         onClose={onClose}
       />
-      {showDetail && !isPermit && !isRig && <ActionLinks links={WELL_ACTIONS} onAction={onAction} />}
-      <KpiTiles tiles={tiles} />
-      {showDetail && (
+      {showDetail && !isPermit && !isRig && <ActionLinks links={WELL_ACTIONS} active={view} onAction={onWellAction} />}
+      {showDetail && isWellbore ? (
+        <Section title="Wellbore & Completion Design" extra={<SchematicInfo />} onExpand={() => setExpanded("wellbore")}>
+          <WellboreSchematic wb={wellbore} />
+          <div className="mt-2">
+            <WellboreTables tables={wellbore.tables} />
+          </div>
+        </Section>
+      ) : (
+        <KpiTiles tiles={tiles} />
+      )}
+      {showDetail && !isWellbore && (
         <>
           {hasProduction && (
             <Section title="Production Decline" onExpand={det.production.length ? () => setExpanded("chart") : undefined}>
@@ -233,11 +266,21 @@ export function RecordDetail({
         <DialogContent className="w-[min(760px,94vw)] rounded-2xl">
           <div className="border-b border-border px-[22px] py-[18px] pr-14">
             <DialogTitle className="text-lg font-semibold">
-              {expanded === "chart" ? "Production Decline" : "Timeline"} · {well.name}
+              {expanded === "chart" ? "Production Decline" : expanded === "wellbore" ? "Wellbore & Completion Design" : "Timeline"} ·{" "}
+              {well.name}
             </DialogTitle>
           </div>
-          <div className="max-h-[70vh] overflow-y-auto px-[22px] py-4">
-            {expanded === "chart" ? <ProductionChart data={det.production} height={340} /> : <Timeline steps={det.timeline} />}
+          <div className="max-h-[75vh] overflow-y-auto px-[22px] py-4">
+            {expanded === "chart" && <ProductionChart data={det.production} height={340} />}
+            {expanded === "timeline" && <Timeline steps={det.timeline} />}
+            {expanded === "wellbore" && (
+              <>
+                <WellboreSchematic wb={wellbore} height={420} />
+                <div className="mt-3">
+                  <WellboreTables tables={wellbore.tables} />
+                </div>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
