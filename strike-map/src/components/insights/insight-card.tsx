@@ -29,7 +29,7 @@ export function InsightCard({
     <>
       <Card size="sm">
         <CardHeader className="chart-header border-b border-orange-500">
-          <CardTitle className="min-w-0 truncate text-xs font-semibold whitespace-nowrap text-s-muted normal-case">{title}</CardTitle>
+          <CardTitle className="min-w-0 truncate text-sm font-semibold whitespace-nowrap text-s-muted normal-case">{title}</CardTitle>
           {hasTools && (
             <CardAction>
               <ChartToolButtons title={title} tools={{ onExport, onMaximize: renderExpanded ? () => setOpen(true) : undefined }} />
