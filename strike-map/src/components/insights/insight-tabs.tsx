@@ -1,7 +1,8 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export type InsightTab = "area" | "wells" | "permits" | "rigs";
 export const NO_STEP: Record<InsightTab, number> = { area: -1, wells: -1, permits: -1, rigs: -1 };
@@ -12,36 +13,36 @@ const TABS: { id: InsightTab; label: string }[] = [
   { id: "rigs", label: "Rigs" },
 ];
 
-/** Toggle button group of small buttons (one active) with count badges; an empty tab is disabled. */
+/**
+ * shadcn ToggleGroup (single, outline, small) with a count Badge in each item. A single toggle
+ * group lets the active item be pressed again to deselect, so that's ignored to keep one tab on.
+ */
 export function InsightTabs({ value, counts, onChange }: { value: InsightTab; counts: Record<InsightTab, number | null>; onChange: (t: InsightTab) => void }) {
   return (
-    <div role="tablist" aria-label="Insights" className="mb-3 flex overflow-hidden rounded-md border border-solid border-s-line-strong">
-      {TABS.map((t, i) => {
+    <ToggleGroup
+      type="single"
+      variant="outline"
+      size="sm"
+      value={value}
+      onValueChange={(v) => v && onChange(v as InsightTab)}
+      aria-label="Insights"
+      className="mb-3 w-full"
+    >
+      {TABS.map((t) => {
         const n = counts[t.id];
         const on = value === t.id;
         return (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={on}
-            disabled={n === 0}
-            onClick={() => onChange(t.id)}
-            className={cn(
-              "inline-flex h-7 min-w-0 flex-auto cursor-pointer items-center justify-center gap-1 border-0 px-2 text-[11px] font-medium whitespace-nowrap outline-none focus-visible:z-[1] focus-visible:ring-[3px] focus-visible:ring-primary/20 disabled:cursor-default disabled:opacity-45",
-              i > 0 && "border-l border-solid border-s-line-strong",
-              on ? "bg-[color-mix(in_srgb,var(--primary)_14%,transparent)] text-primary" : "bg-transparent text-s-text hover:bg-s-chip",
-            )}
-          >
+          <ToggleGroupItem key={t.id} value={t.id} disabled={n === 0} aria-label={n == null ? t.label : `${t.label} (${n})`} className="h-7 gap-1 px-2 text-[11px]">
             {t.label}
             {n != null && (
-              <span className={cn("rounded-full px-1.5 py-px text-[10px] leading-none tabular-nums", on ? "bg-primary/15 text-primary" : "bg-s-chip text-s-muted")}>
+              <Badge variant={on ? "default" : "secondary"} className="h-4 rounded-full px-1.5 py-0 text-[10px] leading-none tabular-nums">
                 {n.toLocaleString("en-US")}
-              </span>
+              </Badge>
             )}
-          </button>
+          </ToggleGroupItem>
         );
       })}
-    </div>
+    </ToggleGroup>
   );
 }
 
