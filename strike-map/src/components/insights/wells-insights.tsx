@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { fmtK, Legend, RangePlot, StackedAreaChart, StackedBarChart, TypeCurveChart } from "./area-charts";
 import { QuickInsights } from "./quick-insights";
 import { DcaChart, elapsedDate, type DcaSeries } from "./dca-chart";
+import { EditorActions, FieldRow, GroupLabel, NumberField, SelectField, SwitchField } from "./card-editor";
 import { InsightCard } from "./insight-card";
 import { downloadText } from "@/lib/download";
 import { ActionLinks, card } from "./record-detail";
@@ -37,7 +38,9 @@ const STREAM: Record<Stream, { label: string; rate: string; vol: string; volDiv:
   oil: { label: "Oil Production", rate: "BBL/D", vol: "Mbbl", volDiv: 1e3, color: "var(--chart-oil)" },
   gas: { label: "Gas Production", rate: "MCF/D", vol: "MMcf", volDiv: 1e3, color: "var(--chart-gas)" },
 };
-const NORMALIZE_FT = 10_000;
+const DEFAULT_NORMALIZE_FT = 10_000;
+const ftLabel = (v: number) => `${+(v / 1000).toFixed(1)}k`;
+const GROUP_OPTIONS = (keys: GroupBy[]) => keys.map((k) => [k, GROUP_LABELS[k]] as [GroupBy, string]);
 const fmtNum = (v: number, digits = 0) => v.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
 // ---- small controls -----------------------------------------------------------------
@@ -98,9 +101,9 @@ function Kpis({ items }: { items: { label: string; value: string }[] }) {
 }
 
 /** A chart card that opens a full-screen copy of itself. */
-function Expandable({ title, render }: { title: string; render: (big: boolean) => React.ReactNode }) {
+function Expandable({ title, render, editor }: { title: string; render: (big: boolean) => React.ReactNode; editor?: (close: () => void) => React.ReactNode }) {
   return (
-    <InsightCard title={title} renderExpanded={() => render(true)}>
+    <InsightCard title={title} renderExpanded={() => render(true)} editor={editor}>
       {render(false)}
     </InsightCard>
   );
@@ -111,7 +114,8 @@ function Expandable({ title, render }: { title: string; render: (big: boolean) =
 function HistoricalProduction({ wells }: { wells: Well[] }) {
   const d = useDataset();
   const [stream, setStream] = React.useState<Stream>("oil");
-  const data = React.useMemo(() => productionByGroup(d, wells, stream), [d, wells, stream]);
+  const [by, setBy] = React.useState<GroupBy>("operator");
+  const data = React.useMemo(() => productionByGroup(d, wells, stream, by), [d, wells, stream, by]);
   const n = data.months.length;
   const [range, setRange] = React.useState<[number, number]>([0, Math.max(0, n - 1)]);
   const firstMonth = data.months[0];
@@ -121,7 +125,20 @@ function HistoricalProduction({ wells }: { wells: Well[] }) {
   const months = data.months.slice(a, b + 1);
   const values = data.values.map((v) => v.slice(a, b + 1));
   const year = (i: number) => (n ? keyToDate(data.months[Math.max(0, i)]).getFullYear() : "—");
-  const title = "Historical Production by Operator";
+  const title = `Historical Production by ${GROUP_LABELS[by]}`;
+  // The edit form works in years; the slider in months.
+  const yearAt = (i: number) => keyToDate(data.months[Math.min(Math.max(0, i), n - 1)]).getFullYear();
+  const firstYear = n ? yearAt(0) : 0,
+    lastYear = n ? yearAt(n - 1) : 0;
+  const fromYear = (y: number) => {
+    const i = data.months.findIndex((m) => keyToDate(m).getFullYear() >= y);
+    setRange([Math.max(0, Math.min(i < 0 ? 0 : i, b - 2)), b]);
+  };
+  const toYear = (y: number) => {
+    let i = n - 1;
+    while (i > 0 && keyToDate(data.months[i]).getFullYear() > y) i--;
+    setRange([a, Math.min(n - 1, Math.max(i, a + 2))]);
+  };
   const exportCsv = () => {
     const ym = (k: number) => `${Math.floor(k / 12)}-${String((k % 12) + 1).padStart(2, "0")}`;
     const q = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
@@ -157,6 +174,34 @@ function HistoricalProduction({ wells }: { wells: Well[] }) {
     <InsightCard
       title={title}
       onExport={exportCsv}
+      editor={(close) => (
+        <>
+          <SelectField
+            label="Stream"
+            value={stream}
+            options={[
+              ["oil", "Oil (BBL/d)"],
+              ["gas", "Gas (MCF/d)"],
+            ]}
+            onChange={setStream}
+          />
+          <SelectField label="Group by" value={by} options={GROUP_OPTIONS(["operator", "formation", "type", "status"])} onChange={setBy} />
+          {n > 1 && (
+            <FieldRow>
+              <NumberField label="From year" integer min={firstYear} max={lastYear} value={yearAt(a)} onCommit={fromYear} />
+              <NumberField label="To year" integer min={firstYear} max={lastYear} value={yearAt(b)} onCommit={toYear} />
+            </FieldRow>
+          )}
+          <EditorActions
+            onReset={() => {
+              setStream("oil");
+              setBy("operator");
+              setRange([0, Math.max(0, n - 1)]);
+            }}
+            onDone={close}
+          />
+        </>
+      )}
       renderExpanded={() => (
         <>
           {chart(true)}
@@ -238,6 +283,23 @@ function SpudYear({ wells }: { wells: Well[] }) {
     <InsightCard
       title={`Spud Year by ${GROUP_LABELS[by]}`}
       onExport={exportCsv}
+      editor={(close) => (
+        <>
+          <SelectField label="Group by" value={by} options={GROUP_OPTIONS(Object.keys(GROUP_LABELS) as GroupBy[])} onChange={setBy} />
+          <FieldRow>
+            <NumberField label="From year" integer min={y0} max={y1} value={lo} onCommit={(v) => setFrom(String(v))} />
+            <NumberField label="To year" integer min={y0} max={y1} value={hi} onCommit={(v) => setTo(String(v))} />
+          </FieldRow>
+          <EditorActions
+            onReset={() => {
+              setBy("operator");
+              setFrom(String(y0));
+              setTo(String(y1));
+            }}
+            onDone={close}
+          />
+        </>
+      )}
       renderExpanded={() => (
         <>
           {body(true)}
@@ -297,7 +359,30 @@ function Benchmarks({ wells }: { wells: Well[] }) {
       </p>
     </>
   );
-  return <Expandable title={`${m.label} by ${GROUP_LABELS[by]}`} render={body} />;
+  return (
+    <Expandable
+      title={`${m.label} by ${GROUP_LABELS[by]}`}
+      render={body}
+      editor={(close) => (
+        <>
+          <SelectField
+            label="Metric"
+            value={metric}
+            options={(Object.keys(METRICS) as Metric[]).map((k) => [k, METRICS[k].label] as [Metric, string])}
+            onChange={setMetric}
+          />
+          <SelectField label="Group by" value={by} options={GROUP_OPTIONS(["operator", "formation"])} onChange={setBy} />
+          <EditorActions
+            onReset={() => {
+              setMetric("eur");
+              setBy("operator");
+            }}
+            onDone={close}
+          />
+        </>
+      )}
+    />
+  );
 }
 
 // ---- Type curve & decline analysis -----------------------------------------------
@@ -307,32 +392,34 @@ function CurveControls({
   setStream,
   normalize,
   setNormalize,
+  normalizeFt,
 }: {
   stream: Stream;
   setStream: (s: Stream) => void;
   normalize: boolean;
   setNormalize: (v: boolean) => void;
+  normalizeFt: number;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
       <StreamTabs value={stream} onChange={setStream} />
       <label className="mb-2 flex items-center gap-1.5 text-xs text-s-text">
-        <Switch checked={normalize} onCheckedChange={setNormalize} aria-label={`Normalize to ${NORMALIZE_FT.toLocaleString("en-US")} ft lateral`} />
-        Normalize to 10k ft
+        <Switch checked={normalize} onCheckedChange={setNormalize} aria-label={`Normalize to ${normalizeFt.toLocaleString("en-US")} ft lateral`} />
+        Normalize to {ftLabel(normalizeFt)} ft
       </label>
     </div>
   );
 }
 
-function TypeCurveView({ wells, stream, setStream, normalize, setNormalize }: CurveProps) {
+function TypeCurveView({ wells, stream, setStream, normalize, setNormalize, normalizeFt, setNormalizeFt }: CurveProps) {
   const d = useDataset();
-  const curve = React.useMemo(() => typeCurve(d, wells, stream, normalize ? NORMALIZE_FT : null), [d, wells, stream, normalize]);
+  const curve = React.useMemo(() => typeCurve(d, wells, stream, normalize ? normalizeFt : null), [d, wells, stream, normalize, normalizeFt]);
   const s = STREAM[stream];
   const peak = curve.points.length ? Math.max(...curve.points.map((p) => p.p50)) : 0;
   const cum12 = curve.points.slice(0, 12).reduce((sum, p) => sum + p.p50 * 30.44, 0);
   const body = (big: boolean) => (
     <>
-      <CurveControls stream={stream} setStream={setStream} normalize={normalize} setNormalize={setNormalize} />
+      <CurveControls stream={stream} setStream={setStream} normalize={normalize} setNormalize={setNormalize} normalizeFt={normalizeFt} />
       <Kpis
         items={[
           { label: "Wells", value: curve.wells.toLocaleString("en-US") },
@@ -343,7 +430,35 @@ function TypeCurveView({ wells, stream, setStream, normalize, setNormalize }: Cu
       <TypeCurveChart points={curve.points} color={s.color} unit={s.rate} height={big ? 380 : 200} />
     </>
   );
-  return <Expandable title="Type Curve" render={body} />;
+  return (
+    <Expandable
+      title="Type Curve"
+      render={body}
+      editor={(close) => (
+        <>
+          <SelectField
+            label="Stream"
+            value={stream}
+            options={[
+              ["oil", "Oil (BBL/d)"],
+              ["gas", "Gas (MCF/d)"],
+            ]}
+            onChange={setStream}
+          />
+          <SwitchField label="Normalize to a lateral length" checked={normalize} onChange={setNormalize} />
+          <NumberField label="Normalized lateral length (ft)" integer min={1000} max={30000} value={normalizeFt} onCommit={setNormalizeFt} />
+          <EditorActions
+            onReset={() => {
+              setStream("oil");
+              setNormalize(true);
+              setNormalizeFt(DEFAULT_NORMALIZE_FT);
+            }}
+            onDone={close}
+          />
+        </>
+      )}
+    />
+  );
 }
 
 type DeclineToggle = "oil" | "gas" | "water" | "gor" | "wor";
@@ -374,19 +489,27 @@ function DeclineToggleItem({ item }: { item: (typeof DECLINE_ITEMS)[number] }) {
   );
 }
 
-function DeclineView({ wells, normalize, setNormalize }: Pick<CurveProps, "wells" | "normalize" | "setNormalize">) {
+function DeclineView({
+  wells,
+  normalize,
+  setNormalize,
+  normalizeFt,
+  setNormalizeFt,
+}: Pick<CurveProps, "wells" | "normalize" | "setNormalize" | "normalizeFt" | "setNormalizeFt">) {
   const d = useDataset();
   // Oil, gas and water each toggle on their own; GOR and WOR each add a log axis on the right.
   const [on, setOn] = React.useState<DeclineToggle[]>(["oil", "gas", "water"]);
+  const [years, setYears] = React.useState(30);
+  const [limits, setLimits] = React.useState<Record<(typeof RATE_KEYS)[number], number>>({ ...DECLINE_LIMIT });
   const fits = React.useMemo(
     () =>
       Object.fromEntries(
         RATE_KEYS.map((k) => {
-          const curve = typeCurve(d, wells, k, normalize ? NORMALIZE_FT : null);
-          return [k, { curve, dca: typeCurveDca(curve, 30, DECLINE_LIMIT[k]) }];
+          const curve = typeCurve(d, wells, k, normalize ? normalizeFt : null);
+          return [k, { curve, dca: typeCurveDca(curve, years, limits[k]) }];
         }),
       ) as Record<(typeof RATE_KEYS)[number], { curve: ReturnType<typeof typeCurve>; dca: ReturnType<typeof typeCurveDca> }>,
-    [d, wells, normalize],
+    [d, wells, normalize, normalizeFt, years, limits],
   );
   const wellCount = fits.oil.curve.wells;
   const monthly = (pts: { t: number; v: number }[]) => pts.map((p) => ({ month: elapsedDate(p.t), v: p.v }));
@@ -447,8 +570,8 @@ function DeclineView({ wells, normalize, setNormalize }: Pick<CurveProps, "wells
         ))}
       </ToggleGroup>
       <label className="mb-2 flex items-center gap-1.5 text-xs text-s-text">
-        <Switch checked={normalize} onCheckedChange={setNormalize} aria-label={`Normalize to ${NORMALIZE_FT.toLocaleString("en-US")} ft lateral`} />
-        Normalize to 10k ft
+        <Switch checked={normalize} onCheckedChange={setNormalize} aria-label={`Normalize to ${normalizeFt.toLocaleString("en-US")} ft lateral`} />
+        Normalize to {ftLabel(normalizeFt)} ft
       </label>
       {!any ? (
         <p className="m-0 py-6 text-center text-xs text-s-muted">Not enough horizontal wells with production history to fit a decline curve.</p>
@@ -512,13 +635,49 @@ function DeclineView({ wells, normalize, setNormalize }: Pick<CurveProps, "wells
           )}
           <p className="m-0 mt-1.5 text-xs text-s-muted">
             Arps hyperbolic fit to the P50 type curve of {wellCount.toLocaleString("en-US")} wells
-            {normalize ? `, normalized to ${NORMALIZE_FT.toLocaleString("en-US")} ft` : ""}; 30-year forecast to the economic limit.
+            {normalize ? `, normalized to ${normalizeFt.toLocaleString("en-US")} ft` : ""}; {years}-year forecast to the economic limit.
           </p>
         </>
       )}
     </>
   );
-  return <Expandable title="DCA Forecast" render={body} />;
+  const toggleSeries = (k: DeclineToggle, v: boolean) => setOn((o) => (v ? [...o.filter((x) => x !== k), k] : o.filter((x) => x !== k)));
+  return (
+    <Expandable
+      title="DCA Forecast"
+      render={body}
+      editor={(close) => (
+        <>
+          <GroupLabel>Series</GroupLabel>
+          {DECLINE_ITEMS.map((item) => (
+            <SwitchField key={item.key} label={`${item.label} (${item.unit})`} checked={on.includes(item.key)} onChange={(v) => toggleSeries(item.key, v)} />
+          ))}
+          <GroupLabel>Type curve</GroupLabel>
+          <SwitchField label="Normalize to a lateral length" checked={normalize} onChange={setNormalize} />
+          <NumberField label="Normalized lateral length (ft)" integer min={1000} max={30000} value={normalizeFt} onCommit={setNormalizeFt} />
+          <GroupLabel>Forecast</GroupLabel>
+          <NumberField label="Forecast length (years)" integer min={1} max={60} value={years} onCommit={setYears} />
+          <FieldRow>
+            <NumberField label="Oil limit (BBL/d)" min={0.1} value={limits.oil} onCommit={(v) => setLimits((l) => ({ ...l, oil: v }))} />
+            <NumberField label="Gas limit (MCF/d)" min={0.1} value={limits.gas} onCommit={(v) => setLimits((l) => ({ ...l, gas: v }))} />
+          </FieldRow>
+          <FieldRow>
+            <NumberField label="Water limit (BBL/d)" min={0.1} value={limits.water} onCommit={(v) => setLimits((l) => ({ ...l, water: v }))} />
+          </FieldRow>
+          <EditorActions
+            onReset={() => {
+              setOn(["oil", "gas", "water"]);
+              setNormalize(true);
+              setNormalizeFt(DEFAULT_NORMALIZE_FT);
+              setYears(30);
+              setLimits({ ...DECLINE_LIMIT });
+            }}
+            onDone={close}
+          />
+        </>
+      )}
+    />
+  );
 }
 
 interface CurveProps {
@@ -527,6 +686,8 @@ interface CurveProps {
   setStream: (s: Stream) => void;
   normalize: boolean;
   setNormalize: (v: boolean) => void;
+  normalizeFt: number;
+  setNormalizeFt: (v: number) => void;
 }
 
 // ---- tab ---------------------------------------------------------------------------
@@ -536,7 +697,8 @@ export function WellsInsights({ wells }: { wells: Well[] }) {
   const [view, setView] = React.useState(WELL_AREA_ACTIONS[0]);
   const [stream, setStream] = React.useState<Stream>("oil");
   const [normalize, setNormalize] = React.useState(true);
-  const curve = { wells, stream, setStream, normalize, setNormalize };
+  const [normalizeFt, setNormalizeFt] = React.useState(DEFAULT_NORMALIZE_FT);
+  const curve = { wells, stream, setStream, normalize, setNormalize, normalizeFt, setNormalizeFt };
   return (
     <div className="flex flex-col gap-2.5">
       <ActionLinks links={WELL_AREA_ACTIONS} active={view} onAction={setView} label="Well workflows" />
@@ -549,7 +711,7 @@ export function WellsInsights({ wells }: { wells: Well[] }) {
       ) : view === WELL_AREA_ACTIONS[2] ? (
         <TypeCurveView {...curve} />
       ) : (
-        <DeclineView wells={wells} normalize={normalize} setNormalize={setNormalize} />
+        <DeclineView wells={wells} normalize={normalize} setNormalize={setNormalize} normalizeFt={normalizeFt} setNormalizeFt={setNormalizeFt} />
       )}
     </div>
   );

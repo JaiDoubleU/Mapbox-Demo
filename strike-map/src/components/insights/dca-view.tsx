@@ -4,13 +4,13 @@ import * as React from "react";
 import { Download, Info, SlidersHorizontal } from "lucide-react";
 import { downloadText, fileSafe } from "@/lib/download";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { dcaCsv, runDca, STREAMS, type ArpsParams, type DcaResult, type Stream } from "@/lib/dca";
 import type { ProductionMonth } from "@/lib/well-details";
 import { cn } from "@/lib/utils";
+import { EditorActions, Field } from "./card-editor";
 import { DcaChart, type DcaSeries } from "./dca-chart";
 
 const STREAM_META: Record<Stream, { label: string; rateUnit: string; color: string; volUnit: string; perFt: string }> = {
@@ -104,7 +104,17 @@ function SeriesItem({ value, on, label, unit, color }: { value: Toggle; on: bool
 }
 
 /** Legend toggles, the rate-time chart (plus GOR/WOR charts when on) and "Modify or Export Forecast". */
-export function DcaForecast({ production, state, height = 180 }: { production: ProductionMonth[]; state: DcaState; height?: number }) {
+export function DcaForecast({
+  production,
+  state,
+  height = 180,
+  onModify,
+}: {
+  production: ProductionMonth[];
+  state: DcaState;
+  height?: number;
+  onModify?: () => void;
+}) {
   const { dca, on, setOn } = state;
   const series = React.useMemo(() => (dca ? buildSeries(production, dca) : null), [production, dca]);
   if (!dca || !series) {
@@ -160,7 +170,7 @@ export function DcaForecast({ production, state, height = 180 }: { production: P
         </span>
         {state.modified && <span className="ml-auto font-medium text-primary">Modified</span>}
       </div>
-      <Button variant="outline" className="mt-2.5 w-full" onClick={() => state.setModifyOpen(true)}>
+      <Button variant="outline" className="mt-2.5 w-full" onClick={onModify ?? (() => state.setModifyOpen(true))}>
         <SlidersHorizontal size={14} strokeWidth={1.75} />
         Modify or Export Forecast
       </Button>
@@ -177,17 +187,15 @@ const toDraft = (dca: DcaResult): Draft =>
     }),
   ) as Draft;
 
-export function ModifyDialog({ production, wellName, state }: { production: ProductionMonth[]; wellName: string; state: DcaState }) {
-  const { dca, fitted, modifyOpen: open, setModifyOpen: onOpenChange } = state;
-  const [draft, setDraft] = React.useState<Draft | null>(null);
-  const [endYear, setEndYear] = React.useState("");
-  React.useEffect(() => {
-    if (open && dca) {
-      setDraft(toDraft(dca));
-      setEndYear(String(dca.endDate.getFullYear()));
-    }
-  }, [open, dca]);
-  if (!dca || !fitted || !draft) return null;
+/**
+ * The per-well forecast parameters (qi, Di, b, Dmin per stream, and the end year) as the body of
+ * the DCA card's edit drawer. Edits are drafts until Apply; Reset to Fit drops every override.
+ */
+export function DcaParamsForm({ production, wellName, state, close }: { production: ProductionMonth[]; wellName: string; state: DcaState; close: () => void }) {
+  const { dca, fitted } = state;
+  const [draft, setDraft] = React.useState<Draft | null>(() => (dca ? toDraft(dca) : null));
+  const [endYear, setEndYear] = React.useState(() => (dca ? String(dca.endDate.getFullYear()) : ""));
+  if (!dca || !fitted || !draft) return <p className="m-0 text-xs text-s-muted">There is no forecast to edit for this well.</p>;
 
   const minYear = dca.forecastStart.getFullYear() + 1;
   const parsed = STREAMS.map((s) => {
@@ -213,7 +221,7 @@ export function ModifyDialog({ production, wellName, state }: { production: Prod
     }
     state.setOverrides(overrides);
     state.setEndDate(yr === fitted.endDate.getFullYear() ? undefined : new Date(yr, fitted.endDate.getMonth(), 1));
-    onOpenChange(false);
+    close();
   };
   const set = (s: Stream, k: keyof Draft[Stream], v: string) => setDraft((d) => (d ? { ...d, [s]: { ...d[s], [k]: v } } : d));
   const fields: { k: keyof Draft[Stream]; label: string }[] = [
@@ -222,89 +230,56 @@ export function ModifyDialog({ production, wellName, state }: { production: Prod
     { k: "b", label: "b" },
     { k: "dMin", label: "Dmin (%/yr)" },
   ];
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[min(560px,94vw)] rounded-2xl">
-        <div className="border-b border-border px-[22px] py-[18px] pr-14">
-          <DialogTitle className="text-lg font-semibold">Modify or Export Forecast</DialogTitle>
-          <p className="m-0 mt-1 text-xs text-s-muted">
-            Modified hyperbolic (Arps) decline, fit from {fmtMonthYear(dca.fitStart)}. qi is the rate at the fit start.
-          </p>
+    <>
+      <p className="m-0 text-xs text-s-muted">Modified hyperbolic (Arps) decline, fit from {fmtMonthYear(dca.fitStart)}. qi is the rate at the fit start.</p>
+      {parsed.map(({ s, ok }) => (
+        <div key={s} className="flex flex-col gap-1.5">
+          <div className="border-b border-border pb-1 text-xs font-semibold uppercase" style={{ color: STREAM_META[s].color }}>
+            {STREAM_META[s].label}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {fields.map((f) => (
+              <Field key={f.k} label={f.label}>
+                <Input
+                  inputMode="decimal"
+                  aria-label={`${STREAM_META[s].label} ${f.label}`}
+                  value={draft[s][f.k]}
+                  onChange={(e) => set(s, f.k, e.target.value)}
+                  aria-invalid={!ok || undefined}
+                  className={cn("h-8 px-2 text-xs font-normal tabular-nums", !ok && "border-destructive")}
+                />
+              </Field>
+            ))}
+          </div>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto px-[22px] py-4">
-          <table className="w-full border-collapse text-xs">
-            <thead>
-              <tr>
-                <th className="pb-1.5 text-left font-semibold text-s-muted" />
-                {fields.map((f) => (
-                  <th key={f.k} className="px-1 pb-1.5 text-left font-semibold text-s-muted">
-                    {f.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {parsed.map(({ s, ok }) => (
-                <tr key={s}>
-                  <th scope="row" className="pr-2 text-left font-semibold whitespace-nowrap" style={{ color: STREAM_META[s].color }}>
-                    {STREAM_META[s].label}
-                  </th>
-                  {fields.map((f) => (
-                    <td key={f.k} className="px-1 py-1">
-                      <Input
-                        inputMode="decimal"
-                        aria-label={`${STREAM_META[s].label} ${f.label}`}
-                        value={draft[s][f.k]}
-                        onChange={(e) => set(s, f.k, e.target.value)}
-                        aria-invalid={!ok || undefined}
-                        className={cn("h-8 px-2 text-xs tabular-nums", !ok && "border-destructive")}
-                      />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!parsed.every((p) => p.ok) && <p className="m-0 mt-1 text-xs text-destructive">qi and Di must be positive, b between 0 and 2, and Dmin below Di.</p>}
-          <label className="mt-3 flex items-center gap-2 text-xs text-s-text">
-            Forecast end year
-            <Input
-              inputMode="numeric"
-              value={endYear}
-              onChange={(e) => setEndYear(e.target.value)}
-              aria-invalid={!yearOk || undefined}
-              className={cn("h-8 w-20 px-2 text-xs tabular-nums", !yearOk && "border-destructive")}
-            />
-            {!yearOk && (
-              <span className="text-destructive">
-                Between {minYear} and {minYear + 60}
-              </span>
-            )}
-          </label>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 border-t border-border px-[22px] py-3">
-          <Button variant="ghost" onClick={() => exportDcaCsv(wellName, production, dca)}>
+      ))}
+      {!parsed.every((p) => p.ok) && <p className="m-0 text-xs text-destructive">qi and Di must be positive, b between 0 and 2, and Dmin below Di.</p>}
+      <Field label="Forecast end year" hint={!yearOk ? `Between ${minYear} and ${minYear + 60}` : undefined}>
+        <Input
+          inputMode="numeric"
+          value={endYear}
+          onChange={(e) => setEndYear(e.target.value)}
+          aria-invalid={!yearOk || undefined}
+          className={cn("h-8 w-24 px-2 text-xs font-normal tabular-nums", !yearOk && "border-destructive")}
+        />
+      </Field>
+      <EditorActions
+        left={
+          <Button variant="ghost" size="sm" onClick={() => exportDcaCsv(wellName, production, dca)}>
             <Download size={14} strokeWidth={1.75} />
             Export CSV
           </Button>
-          <div className="ml-auto flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                state.reset();
-                onOpenChange(false);
-              }}
-            >
-              Reset to Fit
-            </Button>
-            <Button onClick={apply} disabled={!valid}>
-              Apply
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        }
+        onReset={() => {
+          state.reset();
+          close();
+        }}
+        onDone={apply}
+        doneLabel="Apply"
+        doneDisabled={!valid}
+      />
+    </>
   );
 }
 

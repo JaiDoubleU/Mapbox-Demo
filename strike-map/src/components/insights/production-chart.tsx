@@ -7,7 +7,7 @@ import { linearTicks, ScaleToggle, timeTicks, ZoomControls, type YScale } from "
 
 /* Oil / gas / water daily rates on one axis, semi-log by default. Identity is never color alone: each series
    also has its own dash pattern, a direct label at the line end, and a legend entry. */
-const SERIES = [
+const ALL_SERIES = [
   {
     key: "oil",
     label: "Oil",
@@ -31,16 +31,36 @@ const SERIES = [
   },
 ] as const;
 
-type SeriesKey = (typeof SERIES)[number]["key"];
+type SeriesKey = (typeof ALL_SERIES)[number]["key"];
+export type ProductionShow = Partial<Record<SeriesKey, boolean>>;
 
 const fmtRate = (v: number) => (v >= 100 ? Math.round(v).toLocaleString("en-US") : v.toFixed(v >= 10 ? 0 : 1));
 const fmtMonth = (d: Date) => d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
 
-export function ProductionChart({ data, height = 150 }: { data: ProductionMonth[]; height?: number }) {
+/**
+ * Oil / gas / water on one axis. `scale` and `show` may be controlled by the parent (the card's
+ * edit drawer); otherwise the chart keeps its own scale and shows every series.
+ */
+export function ProductionChart({
+  data,
+  height = 150,
+  scale: scaleProp,
+  onScaleChange,
+  show,
+}: {
+  data: ProductionMonth[];
+  height?: number;
+  scale?: YScale;
+  onScaleChange?: (s: YScale) => void;
+  show?: ProductionShow;
+}) {
   const wrapRef = React.useRef<HTMLDivElement>(null);
   const [width, setWidth] = React.useState(320);
   const [hover, setHover] = React.useState<number | null>(null);
-  const [scale, setScale] = React.useState<YScale>("log");
+  const [scaleLocal, setScaleLocal] = React.useState<YScale>("log");
+  const scale = scaleProp ?? scaleLocal;
+  const setScale = onScaleChange ?? setScaleLocal;
+  const SERIES = ALL_SERIES.filter((s) => show?.[s.key] !== false);
   const [zoomMode, setZoomMode] = React.useState(false);
   /** Visible time window (ms); null shows the full history. */
   const [domain, setDomain] = React.useState<[number, number] | null>(null);
@@ -75,7 +95,8 @@ export function ProductionChart({ data, height = 150 }: { data: ProductionMonth[
   const inWindow = visible.filter((p) => p.month.getTime() >= t0 && p.month.getTime() <= t1);
 
   // The y-axis fits the visible window.
-  const values = (inWindow.length ? inWindow : visible).flatMap((p) => [p.oil, p.gas, p.water]);
+  const vals = (inWindow.length ? inWindow : visible).flatMap((p) => SERIES.map((sr) => p[sr.key]));
+  const values = vals.length ? vals : [1, 10]; // every series switched off
   const lo = Math.pow(10, Math.floor(Math.log10(Math.max(0.5, Math.min(...values)))));
   const hi = Math.pow(10, Math.ceil(Math.log10(Math.max(...values))));
   const yTicks: number[] = [];

@@ -8,12 +8,14 @@ import { lngLatInPoly } from "@/lib/geo";
 import type { Lease, StrikeDataset, Well } from "@/lib/strike-data";
 import { fmtDate, gapLabel, getWellDetails, type TimelineStep } from "@/lib/well-details";
 import { cn } from "@/lib/utils";
-import { ProductionChart } from "./production-chart";
+import { ProductionChart, type ProductionShow } from "./production-chart";
 import { SchematicInfo, WellboreSchematic, WellboreTables } from "./wellbore-view";
 import { getWellbore, type DataTable } from "@/lib/wellbore";
 import { downloadText, fileSafe } from "@/lib/download";
 import { InsightCard } from "./insight-card";
-import { DcaForecast, exportDcaCsv, ModifyDialog, ResourceEstimates, useDca } from "./dca-view";
+import { DcaForecast, DcaParamsForm, exportDcaCsv, ResourceEstimates, useDca } from "./dca-view";
+import { EditorActions, GroupLabel, SelectField, SwitchField } from "./card-editor";
+import type { YScale } from "./chart-controls";
 
 export const eyebrow = "text-xs font-semibold text-s-muted uppercase";
 export const card = "card";
@@ -185,6 +187,9 @@ export function RecordDetail({
   const [view, setView] = React.useState(WELL_ACTIONS[0]);
   const wellbore = React.useMemo(() => getWellbore(well, det), [well, det]);
   const dcaState = useDca(det.production);
+  // Production Decline parameters, shared by the card and its maximized view.
+  const [prodScale, setProdScale] = React.useState<YScale>("log");
+  const [prodShow, setProdShow] = React.useState<Required<ProductionShow>>({ oil: true, gas: true, water: true });
   const isWellbore = view === WELL_ACTIONS[1],
     isDca = view === WELL_ACTIONS[2];
   const isPermit = well.cat === "permit",
@@ -247,7 +252,10 @@ export function RecordDetail({
         <>
           <InsightCard
             title="DCA Forecast"
-            onEdit={dcaState.dca ? () => dcaState.setModifyOpen(true) : undefined}
+            editorTitle="Forecast parameters"
+            editor={dcaState.dca ? (close) => <DcaParamsForm production={det.production} wellName={well.name} state={dcaState} close={close} /> : undefined}
+            editorOpen={dcaState.modifyOpen}
+            onEditorOpenChange={dcaState.setModifyOpen}
             onExport={dcaState.dca ? () => exportDcaCsv(well.name, det.production, dcaState.dca!) : undefined}
             onMaximize={dcaState.dca ? () => setExpanded("dca") : undefined}
           >
@@ -279,13 +287,38 @@ export function RecordDetail({
           {hasProduction && (
             <InsightCard
               title="Production Decline"
-              // Editing production means adjusting its decline forecast.
-              onEdit={
-                det.production.length && dcaState.dca
-                  ? () => {
-                      setView(WELL_ACTIONS[2]);
-                      dcaState.setModifyOpen(true);
-                    }
+              editor={
+                det.production.length
+                  ? (close) => (
+                      <>
+                        <SelectField
+                          label="Y-axis scale"
+                          value={prodScale}
+                          options={[
+                            ["log", "Semi-log"],
+                            ["linear", "Linear"],
+                          ]}
+                          onChange={setProdScale}
+                        />
+                        <GroupLabel>Series</GroupLabel>
+                        {(
+                          [
+                            ["oil", "Oil (BBL/d)"],
+                            ["gas", "Gas (MCF/d)"],
+                            ["water", "Water (BBL/d)"],
+                          ] as const
+                        ).map(([k, label]) => (
+                          <SwitchField key={k} label={label} checked={prodShow[k]} onChange={(v) => setProdShow((o) => ({ ...o, [k]: v }))} />
+                        ))}
+                        <EditorActions
+                          onReset={() => {
+                            setProdScale("log");
+                            setProdShow({ oil: true, gas: true, water: true });
+                          }}
+                          onDone={close}
+                        />
+                      </>
+                    )
                   : undefined
               }
               onExport={
@@ -293,7 +326,7 @@ export function RecordDetail({
               }
               onMaximize={det.production.length ? () => setExpanded("chart") : undefined}
             >
-              <ProductionChart data={det.production} />
+              <ProductionChart data={det.production} scale={prodScale} onScaleChange={setProdScale} show={prodShow} />
             </InsightCard>
           )}
           <InsightCard title="Timeline" onMaximize={() => setExpanded("timeline")}>
@@ -304,7 +337,6 @@ export function RecordDetail({
           </InsightCard>
         </>
       )}
-      <ModifyDialog production={det.production} wellName={well.name} state={dcaState} />
       <Dialog open={expanded != null} onOpenChange={(o) => !o && setExpanded(null)}>
         <DialogContent
           className={cn("rounded-2xl", expanded === "wellbore" ? "w-[min(1240px,96vw)]" : "w-[min(760px,94vw)]")}
@@ -330,11 +362,19 @@ export function RecordDetail({
             </div>
           )}
           <div className={cn("overflow-y-auto px-[22px] py-4", expanded === "wellbore" ? "max-h-[86vh]" : "max-h-[75vh]")}>
-            {expanded === "chart" && <ProductionChart data={det.production} height={340} />}
+            {expanded === "chart" && <ProductionChart data={det.production} height={340} scale={prodScale} onScaleChange={setProdScale} show={prodShow} />}
             {expanded === "timeline" && <Timeline steps={det.timeline} />}
             {expanded === "dca" && dcaState.dca && (
               <>
-                <DcaForecast production={det.production} state={dcaState} height={340} />
+                <DcaForecast
+                  production={det.production}
+                  state={dcaState}
+                  height={340}
+                  onModify={() => {
+                    setExpanded(null);
+                    dcaState.setModifyOpen(true);
+                  }}
+                />
                 <div className="mt-4">
                   <ResourceEstimates dca={dcaState.dca} production={det.production} lateralFt={det.lateralFt} />
                 </div>
