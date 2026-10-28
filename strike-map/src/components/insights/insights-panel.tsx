@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { LeaseDetail, RecordDetail, SelectionStepper } from "./record-detail";
 import { useDataset } from "@/lib/dataset-context";
 import type { Well } from "@/lib/strike-data";
 import type { ApiCopyMode, Layers } from "@/lib/types";
@@ -97,6 +98,12 @@ interface InsightsPanelProps {
   onToggleExpanded?: () => void;
   onCopyApi: (wells: Well[], mode: ApiCopyMode) => void;
   onExport: (summary: ExportSummary) => void;
+  /** Detail view: drop one record or lease from the selection, or clear it entirely. */
+  onRemoveRecord?: (idx: number) => void;
+  onRemoveLease?: (idx: number) => void;
+  onClearSelection?: () => void;
+  /** Short status message (toast). */
+  onNotify?: (msg: string) => void;
 }
 
 /** Right-hand panel: insights for the selection (or everything visible), plus the export flow. */
@@ -110,9 +117,33 @@ export function InsightsPanel({
   sheet = false,
   expanded = false,
   onToggleExpanded,
+  onRemoveRecord,
+  onRemoveLease,
+  onClearSelection,
+  onNotify,
 }: InsightsPanelProps) {
   const showDetail = !sheet || expanded;
   const d = useDataset();
+
+  // ---- detail view: one selected record or lease at a time, with a stepper
+  const items = React.useMemo(
+    () => [
+      ...records.map((w) => ({ key: `w${w.idx}`, well: w, lease: null })),
+      ...selectedLeaseIdxs.map((i) => ({ key: `l${i}`, well: null, lease: d.LEASES[i] })),
+    ],
+    [records, selectedLeaseIdxs, d],
+  );
+  const [activeKey, setActiveKey] = React.useState<string | null>(null);
+  const prevKeys = React.useRef<string[]>([]);
+  React.useEffect(() => {
+    // Show the record that was just added (e.g. Ctrl+click); otherwise keep the current one.
+    const keys = items.map((it) => it.key);
+    const added = keys.filter((k) => !prevKeys.current.includes(k));
+    prevKeys.current = keys;
+    setActiveKey((cur) => (added.length === 1 ? added[0] : cur && keys.includes(cur) && !added.length ? cur : (keys[0] ?? null)));
+  }, [items]);
+  const activeIndex = Math.max(0, items.findIndex((it) => it.key === activeKey));
+  const active = items.length ? items[activeIndex] : null;
   const layerOf = (w: Well) => d.CATS[w.cat].layer;
 
   const hasRecordSel = records.length > 0;
@@ -241,16 +272,44 @@ export function InsightsPanel({
           >
             <span className="h-1 w-9 rounded-full bg-s-line-strong" aria-hidden="true" />
             <span className="flex w-full items-center justify-between">
-              <span className={eyebrow}>Explore this Area</span>
+              <span className={eyebrow}>{active ? "Selected Record" : "Explore this Area"}</span>
               <span className="flex items-center gap-1 text-[11px] font-medium text-s-muted">
                 {expanded ? "Less" : "More"}
                 {expanded ? <ChevronDown size={14} strokeWidth={1.75} /> : <ChevronUp size={14} strokeWidth={1.75} />}
               </span>
             </span>
           </button>
-        ) : (
+        ) : active ? null : (
           <div className={cn(eyebrow, "mb-2.5")}>Explore this Area</div>
         )}
+        {active ? (
+          <div className={showDetail ? "pb-2" : "pb-1"}>
+            <SelectionStepper
+              index={activeIndex}
+              count={items.length}
+              onIndex={(i) => setActiveKey(items[i].key)}
+              onClear={() => onClearSelection?.()}
+            />
+            {active.well ? (
+              <RecordDetail
+                key={active.key}
+                well={active.well}
+                showDetail={showDetail}
+                onClose={() => onRemoveRecord?.(active.well!.idx)}
+                onAction={(label) => onNotify?.(`${label} is coming soon`)}
+              />
+            ) : (
+              <LeaseDetail
+                key={active.key}
+                d={d}
+                lease={active.lease!}
+                showDetail={showDetail}
+                onClose={() => onRemoveLease?.(active.lease!.idx)}
+              />
+            )}
+          </div>
+        ) : (
+        <>
         <div className={cn("flex gap-2", showDetail ? "mb-5" : "mb-1")}>
           {wellsData.length > 0 && <SummaryTile value={wellsData.length} label={sel("Wells")} />}
           {permitsData.length > 0 && <SummaryTile value={permitsData.length} label={sel("Permits")} />}
@@ -313,6 +372,8 @@ export function InsightsPanel({
               ))}
             </div>
           </section>
+        )}
+        </>
         )}
       </div>
 
