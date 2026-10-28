@@ -79,6 +79,18 @@ export function InsightCard({
         <CardContent>{children}</CardContent>
         {footer && <CardFooter>{footer}</CardFooter>}
         {editor && (
+          // Dims the card behind the drawer; clicking it closes the drawer.
+          <div
+            aria-hidden="true"
+            data-slot="card-drawer-scrim"
+            onClick={() => setDrawer(false)}
+            className={cn(
+              "absolute inset-0 z-10 bg-black/40 transition-opacity duration-300 ease-out motion-reduce:transition-none",
+              drawerOpen ? "opacity-100" : "pointer-events-none opacity-0",
+            )}
+          />
+        )}
+        {editor && (
           <div
             ref={drawerRef}
             data-slot="card-drawer"
