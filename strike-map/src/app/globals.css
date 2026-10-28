@@ -111,6 +111,14 @@
   --shadow-overlay: 0 10px 15px -3px rgb(0 0 0 / 0.45), 0 4px 6px -4px rgb(0 0 0 / 0.45);
 }
 
+/* TEMP audit: .chart-header outside a .card gets a red bottom border (inside one stays orange). */
+.chart-header {
+  border-bottom-color: red;
+}
+.card .chart-header {
+  border-bottom-color: var(--color-orange-500);
+}
+
 @layer components {
   /* Panel card: the surface used by every section in the Insights panel. */
   .card {
