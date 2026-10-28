@@ -1,13 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Button } from "@/components/ui/button";
 import {
   benchmarks,
   GROUP_LABELS,
@@ -67,26 +63,6 @@ function StreamTabs({ value, onChange }: { value: Stream; onChange: (s: Stream) 
   );
 }
 
-function Picker<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: [T, string][]; onChange: (v: T) => void }) {
-  return (
-    <label className="flex items-center gap-1.5 text-xs text-s-text">
-      {label}
-      <Select value={value} onValueChange={(v) => onChange(v as T)}>
-        <SelectTrigger aria-label={label} className="h-7 min-w-[104px] rounded-md px-2 text-xs">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map(([v, l]) => (
-            <SelectItem key={v} value={v} className="text-xs">
-              {l}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </label>
-  );
-}
-
 function Kpis({ items }: { items: { label: string; value: string }[] }) {
   return (
     <div className="mb-2.5 flex gap-2">
@@ -124,7 +100,6 @@ function HistoricalProduction({ wells }: { wells: Well[] }) {
   const [a, b] = [Math.min(range[0], n - 1), Math.min(range[1], n - 1)];
   const months = data.months.slice(a, b + 1);
   const values = data.values.map((v) => v.slice(a, b + 1));
-  const year = (i: number) => (n ? keyToDate(data.months[Math.max(0, i)]).getFullYear() : "—");
   const title = `Historical Production by ${GROUP_LABELS[by]}`;
   // The edit form works in years; the slider in months.
   const yearAt = (i: number) => keyToDate(data.months[Math.min(Math.max(0, i), n - 1)]).getFullYear();
@@ -152,22 +127,6 @@ function HistoricalProduction({ wells }: { wells: Well[] }) {
     <>
       <StreamTabs value={stream} onChange={setStream} />
       <StackedAreaChart months={months} groups={data.groups} values={values} unit={STREAM[stream].rate} height={big ? 380 : 190} />
-      {n > 1 && (
-        <div className="mt-1 flex items-center gap-2 pl-[38px]">
-          <span className="rounded border border-s-line-strong px-1.5 py-0.5 text-xs text-s-text tabular-nums">{year(a)}</span>
-          <Slider
-            min={0}
-            max={n - 1}
-            step={1}
-            minStepsBetweenThumbs={2}
-            value={[a, b]}
-            onValueChange={(v) => setRange([v[0], v[1]])}
-            thumbLabels={["Start month", "End month"]}
-            className="flex-1"
-          />
-          <span className="rounded border border-s-line-strong px-1.5 py-0.5 text-xs text-s-text tabular-nums">{year(b)}</span>
-        </div>
-      )}
     </>
   );
   return (
@@ -235,42 +194,8 @@ function SpudYear({ wells }: { wells: Well[] }) {
     i1 = data.years.indexOf(hi);
   const years = i0 >= 0 && i1 >= 0 ? data.years.slice(i0, i1 + 1) : [];
   const values = data.values.map((v) => (i0 >= 0 && i1 >= 0 ? v.slice(i0, i1 + 1) : []));
-  const changed = lo !== y0 || hi !== y1;
   const body = (big: boolean) => (
     <>
-      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <Picker label="Group By:" value={by} options={(Object.keys(GROUP_LABELS) as GroupBy[]).map((k) => [k, GROUP_LABELS[k]])} onChange={setBy} />
-        <div className="flex items-center gap-1.5 text-xs text-s-text">
-          Years:
-          <Input
-            aria-label="From year"
-            inputMode="numeric"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="h-7 w-[58px] px-1.5 text-xs tabular-nums"
-          />
-          to
-          <Input
-            aria-label="To year"
-            inputMode="numeric"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="h-7 w-[58px] px-1.5 text-xs tabular-nums"
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!changed}
-            onClick={() => {
-              setFrom(String(y0));
-              setTo(String(y1));
-            }}
-            className="h-6 rounded-full px-2 text-xs"
-          >
-            Reset
-          </Button>
-        </div>
-      </div>
       <StackedBarChart years={years} groups={data.groups} values={values} height={big ? 340 : 170} />
     </>
   );
