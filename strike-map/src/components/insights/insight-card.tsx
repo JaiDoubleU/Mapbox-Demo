@@ -61,7 +61,7 @@ export function InsightCard({
   return (
     <>
       <Card size="sm" role="region" aria-label={title} className="relative">
-        <CardHeader className="chart-header border-b border-orange-500">
+        <CardHeader className="chart-header border-b border-border">
           {extra ? (
             <div className="flex min-w-0 items-center gap-1.5">
               {heading}

@@ -1,13 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Button } from "@/components/ui/button";
 import {
   benchmarks,
   GROUP_LABELS,
@@ -46,44 +42,30 @@ const fmtNum = (v: number, digits = 0) => v.toLocaleString("en-US", { minimumFra
 // ---- small controls -----------------------------------------------------------------
 
 /** Oil / Gas text tabs above a chart. */
+/** Oil / Gas Production as a single-select toggle group (the active one stays on when pressed again). */
 function StreamTabs({ value, onChange }: { value: Stream; onChange: (s: Stream) => void }) {
   return (
-    <div role="tablist" aria-label="Stream" className="mb-2 flex gap-3">
+    <ToggleGroup
+      type="single"
+      variant="outline"
+      size="sm"
+      value={value}
+      onValueChange={(v) => v && onChange(v as Stream)}
+      aria-label="Stream"
+      className="mb-2 w-full"
+    >
       {(["oil", "gas"] as Stream[]).map((s) => (
-        <button
-          key={s}
-          role="tab"
-          aria-selected={value === s}
-          onClick={() => onChange(s)}
-          className={cn(
-            "cursor-pointer border-none bg-transparent p-0 text-xs font-semibold uppercase outline-none focus-visible:underline",
-            value === s ? "text-s-text" : "text-s-faint hover:text-s-muted",
-          )}
-        >
-          {STREAM[s].label} - {STREAM[s].rate}
-        </button>
+        <Tooltip key={s}>
+          <TooltipTrigger asChild>
+            {/* The tooltip trigger overwrites data-state, so the pressed style keys off aria-checked. */}
+            <ToggleGroupItem value={s} className="h-7 px-2 text-xs aria-checked:bg-accent aria-checked:text-accent-foreground">
+              {STREAM[s].label}
+            </ToggleGroupItem>
+          </TooltipTrigger>
+          <TooltipContent side="top">Measured in {STREAM[s].rate}</TooltipContent>
+        </Tooltip>
       ))}
-    </div>
-  );
-}
-
-function Picker<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: [T, string][]; onChange: (v: T) => void }) {
-  return (
-    <label className="flex items-center gap-1.5 text-xs text-s-text">
-      {label}
-      <Select value={value} onValueChange={(v) => onChange(v as T)}>
-        <SelectTrigger aria-label={label} className="h-7 min-w-[104px] rounded-md px-2 text-xs">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map(([v, l]) => (
-            <SelectItem key={v} value={v} className="text-xs">
-              {l}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </label>
+    </ToggleGroup>
   );
 }
 
@@ -124,7 +106,6 @@ function HistoricalProduction({ wells }: { wells: Well[] }) {
   const [a, b] = [Math.min(range[0], n - 1), Math.min(range[1], n - 1)];
   const months = data.months.slice(a, b + 1);
   const values = data.values.map((v) => v.slice(a, b + 1));
-  const year = (i: number) => (n ? keyToDate(data.months[Math.max(0, i)]).getFullYear() : "—");
   const title = `Historical Production by ${GROUP_LABELS[by]}`;
   // The edit form works in years; the slider in months.
   const yearAt = (i: number) => keyToDate(data.months[Math.min(Math.max(0, i), n - 1)]).getFullYear();
@@ -152,22 +133,6 @@ function HistoricalProduction({ wells }: { wells: Well[] }) {
     <>
       <StreamTabs value={stream} onChange={setStream} />
       <StackedAreaChart months={months} groups={data.groups} values={values} unit={STREAM[stream].rate} height={big ? 380 : 190} />
-      {n > 1 && (
-        <div className="mt-1 flex items-center gap-2 pl-[38px]">
-          <span className="rounded border border-s-line-strong px-1.5 py-0.5 text-xs text-s-text tabular-nums">{year(a)}</span>
-          <Slider
-            min={0}
-            max={n - 1}
-            step={1}
-            minStepsBetweenThumbs={2}
-            value={[a, b]}
-            onValueChange={(v) => setRange([v[0], v[1]])}
-            thumbLabels={["Start month", "End month"]}
-            className="flex-1"
-          />
-          <span className="rounded border border-s-line-strong px-1.5 py-0.5 text-xs text-s-text tabular-nums">{year(b)}</span>
-        </div>
-      )}
     </>
   );
   return (
@@ -235,42 +200,8 @@ function SpudYear({ wells }: { wells: Well[] }) {
     i1 = data.years.indexOf(hi);
   const years = i0 >= 0 && i1 >= 0 ? data.years.slice(i0, i1 + 1) : [];
   const values = data.values.map((v) => (i0 >= 0 && i1 >= 0 ? v.slice(i0, i1 + 1) : []));
-  const changed = lo !== y0 || hi !== y1;
   const body = (big: boolean) => (
     <>
-      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <Picker label="Group By:" value={by} options={(Object.keys(GROUP_LABELS) as GroupBy[]).map((k) => [k, GROUP_LABELS[k]])} onChange={setBy} />
-        <div className="flex items-center gap-1.5 text-xs text-s-text">
-          Years:
-          <Input
-            aria-label="From year"
-            inputMode="numeric"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="h-7 w-[58px] px-1.5 text-xs tabular-nums"
-          />
-          to
-          <Input
-            aria-label="To year"
-            inputMode="numeric"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="h-7 w-[58px] px-1.5 text-xs tabular-nums"
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!changed}
-            onClick={() => {
-              setFrom(String(y0));
-              setTo(String(y1));
-            }}
-            className="h-6 rounded-full px-2 text-xs"
-          >
-            Reset
-          </Button>
-        </div>
-      </div>
       <StackedBarChart years={years} groups={data.groups} values={values} height={big ? 340 : 170} />
     </>
   );
@@ -340,10 +271,6 @@ function Benchmarks({ wells }: { wells: Well[] }) {
   const m = METRICS[metric];
   const body = () => (
     <>
-      <div className="mb-2.5 flex flex-wrap gap-x-3 gap-y-2">
-        <Picker label="Metric:" value={metric} options={(Object.keys(METRICS) as Metric[]).map((k) => [k, METRICS[k].label])} onChange={setMetric} />
-        <Picker label="By:" value={by} options={(["operator", "formation"] as GroupBy[]).map((k) => [k, GROUP_LABELS[k]])} onChange={setBy} />
-      </div>
       {res.overall.n > 0 && (
         <Kpis
           items={[
@@ -400,13 +327,18 @@ const RATE_KEYS = ["oil", "gas", "water"] as const;
 const DECLINE_LIMIT = { oil: 2, gas: 10, water: 1 } as const;
 const DECLINE_VOL = { oil: { unit: "Mbbl", div: 1e3 }, gas: { unit: "MMcf", div: 1e3 }, water: { unit: "Mbbl", div: 1e3 } } as const;
 
-/** One button of the series toggle group: just the word, the unit in a tooltip. */
-function DeclineToggleItem({ item }: { item: (typeof DECLINE_ITEMS)[number] }) {
+/** One button of the series toggle group: the series colour dot and word, the unit in a tooltip. */
+function DeclineToggleItem({ item, on }: { item: (typeof DECLINE_ITEMS)[number]; on: boolean }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         {/* The tooltip trigger overwrites data-state, so the pressed style keys off aria-pressed. */}
-        <ToggleGroupItem value={item.key} className="h-7 px-2 text-xs aria-pressed:bg-accent aria-pressed:text-accent-foreground">
+        <ToggleGroupItem value={item.key} className="h-7 gap-1.5 px-2 text-xs aria-pressed:bg-accent aria-pressed:text-accent-foreground">
+          {/* The series colour: filled when on, a ring when off. */}
+          <span
+            className="inline-block size-2 rounded-full border-2 border-solid"
+            style={{ borderColor: item.color, background: on ? item.color : "transparent" }}
+          />
           {item.label}
         </ToggleGroupItem>
       </TooltipTrigger>
@@ -498,7 +430,7 @@ function DeclineView({
         className="mb-2 w-full"
       >
         {DECLINE_ITEMS.map((item) => (
-          <DeclineToggleItem key={item.key} item={item} />
+          <DeclineToggleItem key={item.key} item={item} on={on.includes(item.key)} />
         ))}
       </ToggleGroup>
       <label className="mb-2 flex items-center gap-1.5 text-xs text-s-text">
