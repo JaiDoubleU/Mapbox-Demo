@@ -380,7 +380,7 @@ export function RecordDetail({
               <>
                 <WellboreSchematic wb={wellbore} detailed height={Math.round(Math.max(380, Math.min(640, window.innerHeight - 400)))} />
                 <div className="mt-2">
-                  <WellboreTables tables={wellbore.tables} />
+                  <WellboreTables tables={wellbore.tables} maxRows={4} />
                 </div>
               </>
             )}

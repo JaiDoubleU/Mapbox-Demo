@@ -247,7 +247,13 @@ export function WellboreSchematic({ wb, height = 250, detailed = false }: { wb: 
 const PAGE = 8;
 const asNumber = (c: Cell) => (typeof c === "number" ? c : Number(String(c).replace(/[^0-9.-]/g, "")));
 
-export function WellboreTables({ tables }: { tables: DataTable[] }) {
+const ROW_PX = 33;
+
+/**
+ * Tabbed data tables. By default 8 rows per page with Prev/Next; with `maxRows` every row is
+ * listed in a box that shows at most that many (header pinned) and scrolls for the rest.
+ */
+export function WellboreTables({ tables, maxRows }: { tables: DataTable[]; maxRows?: number }) {
   const [tabId, setTabId] = React.useState(tables[0].id);
   const [sort, setSort] = React.useState<{ key: string; dir: 1 | -1 } | null>(null);
   const [page, setPage] = React.useState(0);
@@ -265,8 +271,9 @@ export function WellboreTables({ tables }: { tables: DataTable[] }) {
         const cmp = col?.numeric ? asNumber(va) - asNumber(vb) : String(va).localeCompare(String(vb));
         return cmp * dir;
       });
-  const pages = Math.max(1, Math.ceil(rows.length / PAGE));
-  const shown = rows.slice(page * PAGE, page * PAGE + PAGE);
+  const scroll = maxRows != null;
+  const pages = scroll ? 1 : Math.max(1, Math.ceil(rows.length / PAGE));
+  const shown = scroll ? rows : rows.slice(page * PAGE, page * PAGE + PAGE);
 
   const pick = (id: string) => {
     setTabId(id);
@@ -303,16 +310,29 @@ export function WellboreTables({ tables }: { tables: DataTable[] }) {
         </button>
       </div>
 
-      <div className="min-h-[170px] overflow-x-auto" role="tabpanel">
+      <div
+        className={cn("overflow-x-auto", scroll ? "overflow-y-auto overscroll-contain" : "min-h-[170px]")}
+        style={scroll ? { maxHeight: ROW_PX * (maxRows + 1) + 1 } : undefined}
+        role="tabpanel"
+      >
+        {/* Separate borders in scroll mode: collapsed borders paint over a sticky header. */}
         {rows.length ? (
-          <table className="w-max min-w-full border-collapse text-xs">
+          <table className={cn("w-max min-w-full text-xs", scroll ? "border-separate border-spacing-0" : "border-collapse")}>
             <thead>
               <tr>
                 {table.columns.map((c) => {
                   const active = c.key === sortKey;
                   const Icon = active ? (dir === 1 ? ArrowUp : ArrowDown) : ChevronsUpDown;
                   return (
-                    <th key={c.key} scope="col" className="border-b border-s-line px-2.5 py-2 text-left font-semibold whitespace-nowrap text-s-text">
+                    <th
+                      key={c.key}
+                      scope="col"
+                      style={scroll ? { height: ROW_PX } : undefined}
+                      className={cn(
+                        "px-2.5 py-2 text-left font-semibold whitespace-nowrap text-s-text",
+                        scroll ? "sticky top-0 z-[1] bg-card shadow-[inset_0_-1px_0_var(--s-line)]" : "border-b border-s-line",
+                      )}
+                    >
                       <button
                         onClick={() => {
                           setSort({ key: c.key, dir: active ? ((dir === 1 ? -1 : 1) as 1 | -1) : 1 });
@@ -330,9 +350,16 @@ export function WellboreTables({ tables }: { tables: DataTable[] }) {
             </thead>
             <tbody>
               {shown.map((r, i) => (
-                <tr key={i} className="border-b border-s-line last:border-b-0">
+                <tr key={i} className={cn(!scroll && "border-b border-s-line last:border-b-0")} style={scroll ? { height: ROW_PX } : undefined}>
                   {table.columns.map((c) => (
-                    <td key={c.key} className={cn("px-2.5 py-2 whitespace-nowrap text-s-text", c.numeric && "tabular-nums")}>
+                    <td
+                      key={c.key}
+                      className={cn(
+                        "px-2.5 py-2 whitespace-nowrap text-s-text",
+                        c.numeric && "tabular-nums",
+                        scroll && i < shown.length - 1 && "border-b border-s-line",
+                      )}
+                    >
                       {r[c.key]}
                     </td>
                   ))}
@@ -345,25 +372,27 @@ export function WellboreTables({ tables }: { tables: DataTable[] }) {
         )}
       </div>
 
-      <div className="flex items-center justify-between border-t border-s-line pt-2 text-xs">
-        <button
-          onClick={() => setPage((p) => p - 1)}
-          disabled={page === 0}
-          className="flex cursor-pointer items-center gap-1 border-none bg-transparent p-0 text-s-text disabled:cursor-default disabled:text-s-faint"
-        >
-          <ChevronLeft size={12} strokeWidth={1.75} /> Prev
-        </button>
-        <span className="text-s-text tabular-nums">
-          {page + 1} of {pages}
-        </span>
-        <button
-          onClick={() => setPage((p) => p + 1)}
-          disabled={page >= pages - 1}
-          className="flex cursor-pointer items-center gap-1 border-none bg-transparent p-0 text-s-text disabled:cursor-default disabled:text-s-faint"
-        >
-          Next <ChevronRight size={12} strokeWidth={1.75} />
-        </button>
-      </div>
+      {!scroll && (
+        <div className="flex items-center justify-between border-t border-s-line pt-2 text-xs">
+          <button
+            onClick={() => setPage((p) => p - 1)}
+            disabled={page === 0}
+            className="flex cursor-pointer items-center gap-1 border-none bg-transparent p-0 text-s-text disabled:cursor-default disabled:text-s-faint"
+          >
+            <ChevronLeft size={12} strokeWidth={1.75} /> Prev
+          </button>
+          <span className="text-s-text tabular-nums">
+            {page + 1} of {pages}
+          </span>
+          <button
+            onClick={() => setPage((p) => p + 1)}
+            disabled={page >= pages - 1}
+            className="flex cursor-pointer items-center gap-1 border-none bg-transparent p-0 text-s-text disabled:cursor-default disabled:text-s-faint"
+          >
+            Next <ChevronRight size={12} strokeWidth={1.75} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
