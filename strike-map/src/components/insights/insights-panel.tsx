@@ -3,18 +3,16 @@
 import * as React from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { LeaseDetail, RecordDetail, SelectionStepper } from "./record-detail";
+import { BarRow, SummaryTile, topCounts } from "./panel-bits";
+import { GroupStepper, InsightTabs, NO_STEP, type InsightTab } from "./insight-tabs";
+import { QuickInsights } from "./quick-insights";
+import { WellsInsights } from "./wells-insights";
 import { useDataset } from "@/lib/dataset-context";
 import type { Well } from "@/lib/strike-data";
 import type { ApiCopyMode, Layers } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  ExportOptionsPopover,
-  initialChecks,
-  type ExportChecks,
-  type ExportSectionDef,
-  type ExportSummary,
-} from "./export-options-popover";
+import { ExportOptionsPopover, initialChecks, type ExportChecks, type ExportSectionDef, type ExportSummary } from "./export-options-popover";
 
 const TYPE_COLORS: Record<string, string> = {
   "Oil Well": "#62c23f",
@@ -26,66 +24,6 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 const eyebrow = "text-[11px] font-semibold text-s-muted uppercase";
-
-function SummaryTile({ value, label }: { value: number; label: string }) {
-  return (
-    <div className="flex-1 rounded-lg border border-s-line bg-s-card px-3 py-2.5">
-      <div className="text-xl leading-none font-bold text-s-text">{value.toLocaleString()}</div>
-      <div className="mt-1 text-[10px] text-s-muted">{label}</div>
-    </div>
-  );
-}
-
-function BarRow({
-  label,
-  count,
-  max,
-  color,
-  dot,
-  labelWidth,
-  barWidth,
-  countWidth = 42,
-}: {
-  label: string;
-  count: number;
-  max: number;
-  color: string;
-  dot?: string;
-  labelWidth?: number;
-  barWidth?: number;
-  countWidth?: number;
-}) {
-  return (
-    <div className="mb-[7px] flex items-center gap-2">
-      {dot && <div className="size-2 shrink-0 rounded-full" style={{ background: dot }} />}
-      <div
-        className={cn("truncate text-xs text-s-text", labelWidth ? "shrink-0" : "flex-1")}
-        style={labelWidth ? { width: labelWidth } : undefined}
-      >
-        {label}
-      </div>
-      <div
-        className={cn("h-1 overflow-hidden rounded-[2px] bg-s-line", barWidth ? "shrink-0" : "flex-1")}
-        style={barWidth ? { width: barWidth } : undefined}
-      >
-        <div
-          className="h-full rounded-[2px] transition-[width] duration-300"
-          style={{ width: `${(count / max) * 100}%`, background: color }}
-        />
-      </div>
-      <div className="shrink-0 text-right text-xs text-s-muted" style={{ width: countWidth }}>
-        {count.toLocaleString()}
-      </div>
-    </div>
-  );
-}
-
-function topCounts(items: Well[], key: (w: Well) => string, limit?: number) {
-  const counts: Record<string, number> = {};
-  items.forEach((w) => (counts[key(w)] = (counts[key(w)] || 0) + 1));
-  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  return limit ? entries.slice(0, limit) : entries;
-}
 
 interface InsightsPanelProps {
   records: Well[];
@@ -130,17 +68,12 @@ export function InsightsPanel({
     ],
     [records, selectedLeaseIdxs, d],
   );
-  const [activeKey, setActiveKey] = React.useState<string | null>(null);
-  const prevKeys = React.useRef<string[]>([]);
-  React.useEffect(() => {
-    // Show the record that was just added (e.g. Ctrl+click); otherwise keep the current one.
-    const keys = items.map((it) => it.key);
-    const added = keys.filter((k) => !prevKeys.current.includes(k));
-    prevKeys.current = keys;
-    setActiveKey((cur) => (added.length === 1 ? added[0] : cur && keys.includes(cur) && !added.length ? cur : (keys[0] ?? null)));
-  }, [items]);
-  const activeIndex = Math.max(0, items.findIndex((it) => it.key === activeKey));
-  const active = items.length ? items[activeIndex] : null;
+  // One selected item shows its detail view; none or several show the tabs.
+  const active = items.length === 1 ? items[0] : null;
+  const [tab, setTab] = React.useState<InsightTab>("area");
+  /** Per tab, the selected item being viewed (-1 = all of them). */
+  const [step, setStep] = React.useState<Record<InsightTab, number>>(NO_STEP);
+  React.useEffect(() => setStep(NO_STEP), [records, selectedLeaseIdxs]);
   const layerOf = (w: Well) => d.CATS[w.cat].layer;
 
   const hasRecordSel = records.length > 0;
@@ -162,6 +95,18 @@ export function InsightsPanel({
   const horizCount = wellsData.filter((w) => w.orientation === "Horizontal").length;
   const vertCount = wellsData.filter((w) => w.orientation === "Vertical").length;
   const sel = (label: string) => (hasRecordSel ? `${label} Selected` : label);
+  const counts: Record<InsightTab, number | null> = { area: null, wells: wellsData.length, permits: permitsData.length, rigs: rigsData.length };
+  // An emptied tab (layer turned off, selection changed) falls back to Area Insights.
+  const tabEmpty = counts[tab] === 0;
+  React.useEffect(() => {
+    if (tabEmpty) setTab("area");
+  }, [tabEmpty]);
+  // Selected items each tab can step through.
+  const selectedIn: Record<Exclude<InsightTab, "area">, Well[]> = {
+    wells: records.filter((w) => layerOf(w) === "wells"),
+    permits: records.filter((w) => layerOf(w) === "permits"),
+    rigs: records.filter((w) => w.cat === "rig"),
+  };
 
   // ---- export flow
   const [menuOpen, setMenuOpen] = React.useState(false);
@@ -170,7 +115,12 @@ export function InsightsPanel({
 
   const openMenu = () => {
     setExportMode(hasSelection ? "selected" : "all");
-    setChecks(initialChecks(hasSelection, records.some((r) => r.cat === "rig")));
+    setChecks(
+      initialChecks(
+        hasSelection,
+        records.some((r) => r.cat === "rig"),
+      ),
+    );
     setMenuOpen(true);
   };
   const closeMenu = React.useCallback(() => setMenuOpen(false), []);
@@ -193,7 +143,9 @@ export function InsightsPanel({
   const sections: ExportSectionDef[] = [];
   if (show.rigs)
     sections.push({
-      id: "rigs", title: "Active Rigs", recordCount: exportRigs.length,
+      id: "rigs",
+      title: "Active Rigs",
+      recordCount: exportRigs.length,
       countLabel: countLabel(exportRigs.length),
       rows: [
         { key: "rigsCSV", label: "Active Rigs CSV", format: "CSV" },
@@ -202,16 +154,24 @@ export function InsightsPanel({
     });
   if (show.wells)
     sections.push({
-      id: "wells", title: "Wells", recordCount: exportWells.length, copyApi: true,
+      id: "wells",
+      title: "Wells",
+      recordCount: exportWells.length,
+      copyApi: true,
       countLabel: countLabel(exportWells.length),
       rows: [
         {
-          key: "wellFiles", label: "Well Files", format: "PDF", disabled: !hasSelection,
+          key: "wellFiles",
+          label: "Well Files",
+          format: "PDF",
+          disabled: !hasSelection,
           note: !hasSelection ? "Export limit is 100 records. Apply a filter to decrease the number of records" : undefined,
         },
         { key: "wellHeaderCSV", label: "Well Headers CSV", format: "CSV" },
         {
-          key: "wellHeaderSHP", label: "Well Headers SHP", format: "SHP",
+          key: "wellHeaderSHP",
+          label: "Well Headers SHP",
+          format: "SHP",
           geomOptions: ["Surface Hole", "Bottom Hole", "Well Lateral", "Calculated Horizontal Line"],
         },
         { key: "wellMonthlyCSV", label: "Monthly Production", format: "CSV" },
@@ -219,7 +179,9 @@ export function InsightsPanel({
     });
   if (show.permits)
     sections.push({
-      id: "permits", title: "Permits", recordCount: exportPermits.length,
+      id: "permits",
+      title: "Permits",
+      recordCount: exportPermits.length,
       countLabel: countLabel(exportPermits.length),
       rows: [
         { key: "permitsCSV", label: "Permits CSV", format: "CSV" },
@@ -228,7 +190,9 @@ export function InsightsPanel({
     });
   if (show.lease)
     sections.push({
-      id: "lease", title: "Landtrac Lease", recordCount: exportSel ? selectedLeaseIdxs.length : d.LEASES.length,
+      id: "lease",
+      title: "Landtrac Lease",
+      recordCount: exportSel ? selectedLeaseIdxs.length : d.LEASES.length,
       rows: [
         { key: "relatedFiling", label: "Related Filing", format: "PDF" },
         { key: "leaseHeaderCSV", label: "Lease Headers CSV", format: "CSV" },
@@ -240,7 +204,9 @@ export function InsightsPanel({
     });
   if (show.unit)
     sections.push({
-      id: "unit", title: "Landtrac Unit", recordCount: 0,
+      id: "unit",
+      title: "Landtrac Unit",
+      recordCount: 0,
       rows: [
         { key: "landtracUnitCSV", label: "Landtrac Unit CSV", format: "CSV" },
         { key: "landtracUnitSHP", label: "Landtrac Unit SHP", format: "SHP" },
@@ -254,9 +220,7 @@ export function InsightsPanel({
     <div
       className={cn(
         "flex flex-col bg-s-panel",
-        sheet
-          ? "rounded-t-xl border-t border-s-line-strong shadow-[0_-6px_24px_rgba(0,0,0,0.12)]"
-          : "h-full border-l border-s-line-strong",
+        sheet ? "rounded-t-xl border-t border-s-line-strong shadow-[0_-6px_24px_rgba(0,0,0,0.12)]" : "h-full border-l border-s-line-strong",
       )}
       style={sheet && expanded ? { height: "62dvh" } : undefined}
     >
@@ -276,100 +240,154 @@ export function InsightsPanel({
               </span>
             </span>
           </button>
-        ) : active ? null : (
-          <div className={cn(eyebrow, "mb-2.5")}>Explore this Area</div>
-        )}
+        ) : null}
         {active ? (
           <div className={showDetail ? "pb-2" : "pb-1"}>
-            <SelectionStepper
-              index={activeIndex}
-              count={items.length}
-              onIndex={(i) => setActiveKey(items[i].key)}
-              onClear={() => onClearSelection?.()}
-            />
+            <SelectionStepper index={0} count={1} onIndex={() => {}} onClear={() => onClearSelection?.()} />
             {active.well ? (
-              <RecordDetail
-                key={active.key}
-                well={active.well}
-                showDetail={showDetail}
-                onClose={() => onRemoveRecord?.(active.well!.idx)}
-              />
+              <RecordDetail key={active.key} well={active.well} showDetail={showDetail} onClose={() => onRemoveRecord?.(active.well!.idx)} />
             ) : (
-              <LeaseDetail
-                key={active.key}
-                d={d}
-                lease={active.lease!}
-                showDetail={showDetail}
-                onClose={() => onRemoveLease?.(active.lease!.idx)}
-              />
+              <LeaseDetail key={active.key} d={d} lease={active.lease!} showDetail={showDetail} onClose={() => onRemoveLease?.(active.lease!.idx)} />
             )}
           </div>
         ) : (
-        <>
-        <div className={cn("flex gap-2", showDetail ? "mb-5" : "mb-1")}>
-          {wellsData.length > 0 && <SummaryTile value={wellsData.length} label={sel("Wells")} />}
-          {permitsData.length > 0 && <SummaryTile value={permitsData.length} label={sel("Permits")} />}
-          {rigsData.length > 0 && <SummaryTile value={rigsData.length} label={sel("Active Rigs")} />}
-          {(layers.landtracLease !== false || hasLeaseSel) && (
-            <SummaryTile
-              value={hasLeaseSel ? selectedLeaseIdxs.length : d.LEASES.length}
-              label={hasLeaseSel ? "Leases Selected" : "Leases"}
-            />
-          )}
-        </div>
+          <>
+            <InsightTabs value={tab} counts={counts} onChange={setTab} />
+            {tab === "area" ? (
+              hasLeaseSel && selectedLeaseIdxs.length > 0 && step.area >= 0 ? (
+                <>
+                  <GroupStepper
+                    noun="leases"
+                    index={step.area}
+                    count={selectedLeaseIdxs.length}
+                    onIndex={(i) => setStep((st) => ({ ...st, area: i }))}
+                    onClear={() => onClearSelection?.()}
+                  />
+                  <LeaseDetail
+                    key={selectedLeaseIdxs[step.area]}
+                    d={d}
+                    lease={d.LEASES[selectedLeaseIdxs[step.area]]}
+                    showDetail={showDetail}
+                    onClose={() => onRemoveLease?.(selectedLeaseIdxs[step.area])}
+                  />
+                </>
+              ) : (
+                <>
+                  {selectedLeaseIdxs.length > 0 && (
+                    <GroupStepper
+                      noun="leases"
+                      index={-1}
+                      count={selectedLeaseIdxs.length}
+                      onIndex={(i) => setStep((st) => ({ ...st, area: i }))}
+                      onClear={() => onClearSelection?.()}
+                    />
+                  )}
+                  {!sheet && <div className={cn(eyebrow, "mb-2.5")}>Explore this Area</div>}
+                  <div className={cn("flex gap-2", showDetail ? "mb-5" : "mb-1")}>
+                    {wellsData.length > 0 && <SummaryTile value={wellsData.length} label={sel("Wells")} />}
+                    {permitsData.length > 0 && <SummaryTile value={permitsData.length} label={sel("Permits")} />}
+                    {rigsData.length > 0 && <SummaryTile value={rigsData.length} label={sel("Active Rigs")} />}
+                    {(layers.landtracLease !== false || hasLeaseSel) && (
+                      <SummaryTile value={hasLeaseSel ? selectedLeaseIdxs.length : d.LEASES.length} label={hasLeaseSel ? "Leases Selected" : "Leases"} />
+                    )}
+                  </div>
 
-        {showDetail && wellsData.length > 0 && typeEntries.length > 0 && (
-          <section className="mb-5">
-            <div className={cn(eyebrow, "mb-2.5")}>Well Types</div>
-            {typeEntries.map(([type, count]) => (
-              <BarRow
-                key={type}
-                label={type}
-                count={count}
-                max={typeEntries[0][1]}
-                dot={TYPE_COLORS[type] ?? "#888"}
-                color={TYPE_COLORS[type] ?? "var(--primary)"}
-                labelWidth={130}
-              />
-            ))}
-          </section>
-        )}
+                  {showDetail && wellsData.length > 0 && typeEntries.length > 0 && (
+                    <section className="mb-5">
+                      <div className={cn(eyebrow, "mb-2.5")}>Well Types</div>
+                      {typeEntries.map(([type, count]) => (
+                        <BarRow
+                          key={type}
+                          label={type}
+                          count={count}
+                          max={typeEntries[0][1]}
+                          dot={TYPE_COLORS[type] ?? "#888"}
+                          color={TYPE_COLORS[type] ?? "var(--primary)"}
+                          labelWidth={130}
+                        />
+                      ))}
+                    </section>
+                  )}
 
-        {showDetail && topOps.length > 0 && (
-          <section className="mb-5 border-t border-s-line pt-4">
-            <div className={cn(eyebrow, "mb-2.5")}>Top Operators</div>
-            {topOps.map(([op, count]) => (
-              <BarRow key={op} label={op} count={count} max={topOps[0][1]} color="var(--primary)" barWidth={60} countWidth={36} />
-            ))}
-          </section>
-        )}
+                  {showDetail && topOps.length > 0 && (
+                    <section className="mb-5 border-t border-s-line pt-4">
+                      <div className={cn(eyebrow, "mb-2.5")}>Top Operators</div>
+                      {topOps.map(([op, count]) => (
+                        <BarRow key={op} label={op} count={count} max={topOps[0][1]} color="var(--primary)" barWidth={60} countWidth={36} />
+                      ))}
+                    </section>
+                  )}
 
-        {showDetail && wellsData.length > 0 && topForms.length > 0 && (
-          <section className="mb-5 border-t border-s-line pt-4">
-            <div className={cn(eyebrow, "mb-2.5")}>Formations</div>
-            {topForms.map(([form, count]) => (
-              <BarRow key={form} label={form} count={count} max={topForms[0][1]} color="#3b9ae1" labelWidth={120} />
-            ))}
-          </section>
-        )}
+                  {showDetail && wellsData.length > 0 && topForms.length > 0 && (
+                    <section className="mb-5 border-t border-s-line pt-4">
+                      <div className={cn(eyebrow, "mb-2.5")}>Formations</div>
+                      {topForms.map(([form, count]) => (
+                        <BarRow key={form} label={form} count={count} max={topForms[0][1]} color="#3b9ae1" labelWidth={120} />
+                      ))}
+                    </section>
+                  )}
 
-        {showDetail && wellsData.length > 0 && horizCount + vertCount > 0 && (
-          <section className="mb-2 border-t border-s-line pt-4">
-            <div className={cn(eyebrow, "mb-2.5")}>Orientation</div>
-            <div className="flex gap-2">
-              {[
-                [horizCount, "Horizontal"],
-                [vertCount, "Vertical"],
-              ].map(([n, label]) => (
-                <div key={label} className="flex-1 rounded-md border border-s-line bg-s-card px-3 py-2">
-                  <div className="text-lg leading-none font-bold text-s-text">{n.toLocaleString()}</div>
-                  <div className="mt-1 text-[11px] text-s-muted">{label}</div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-        </>
+                  {showDetail && wellsData.length > 0 && horizCount + vertCount > 0 && (
+                    <section className="mb-2 border-t border-s-line pt-4">
+                      <div className={cn(eyebrow, "mb-2.5")}>Orientation</div>
+                      <div className="flex gap-2">
+                        {[
+                          [horizCount, "Horizontal"],
+                          [vertCount, "Vertical"],
+                        ].map(([n, label]) => (
+                          <div key={label} className="flex-1 rounded-md border border-s-line bg-s-card px-3 py-2">
+                            <div className="text-lg leading-none font-bold text-s-text">{n.toLocaleString()}</div>
+                            <div className="mt-1 text-[11px] text-s-muted">{label}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                </>
+              )
+            ) : (
+              (() => {
+                const t = tab;
+                const picked = selectedIn[t];
+                const i = Math.min(step[t], picked.length - 1);
+                const stepper = picked.length > 0 && (
+                  <GroupStepper
+                    noun={t}
+                    index={i}
+                    count={picked.length}
+                    onIndex={(n) => setStep((st) => ({ ...st, [t]: n }))}
+                    onClear={() => onClearSelection?.()}
+                  />
+                );
+                if (i >= 0)
+                  return (
+                    <div className="pb-2">
+                      {stepper}
+                      <RecordDetail key={picked[i].idx} well={picked[i]} showDetail={showDetail} onClose={() => onRemoveRecord?.(picked[i].idx)} />
+                    </div>
+                  );
+                if (!showDetail) return stepper || null;
+                return (
+                  <div className="pb-2">
+                    {stepper}
+                    {t === "wells" ? (
+                      <WellsInsights wells={wellsData} />
+                    ) : (
+                      <QuickInsights
+                        items={t === "permits" ? permitsData : rigsData}
+                        groups={[
+                          { title: t === "permits" ? "Permit Status" : "Rig Status", key: (w) => w.status },
+                          { title: "Operator", key: (w) => w.operator },
+                          { title: "Target Formation", key: (w) => w.formation },
+                          { title: "County", key: (w) => w.county },
+                        ]}
+                      />
+                    )}
+                  </div>
+                );
+              })()
+            )}
+          </>
         )}
       </div>
 

@@ -15,8 +15,8 @@ import { downloadText, fileSafe } from "@/lib/download";
 import { ChartHeader, type ChartTools } from "./chart-header";
 import { DcaForecast, exportDcaCsv, ModifyDialog, ResourceEstimates, useDca } from "./dca-view";
 
-const eyebrow = "text-[11px] font-semibold text-s-muted uppercase";
-const card = "rounded-lg border border-s-line bg-s-card";
+export const eyebrow = "text-[11px] font-semibold text-s-muted uppercase";
+export const card = "rounded-lg border border-s-line bg-s-card";
 const n0 = (v: number) => Math.round(v).toLocaleString("en-US");
 const n1 = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const n2 = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -48,9 +48,9 @@ function HeaderCard({ eyebrow: kind, title, lines, onClose }: { eyebrow: string;
 }
 
 /** Well views. The active one is shown selected (green text, accent bar, tint). */
-function ActionLinks({ links, active, onAction }: { links: string[]; active: string; onAction: (label: string) => void }) {
+export function ActionLinks({ links, active, onAction, label = "Well views" }: { links: string[]; active: string; onAction: (label: string) => void; label?: string }) {
   return (
-    <div className={cn(card, "py-1.5")} role="tablist" aria-orientation="vertical" aria-label="Well views">
+    <div className={cn(card, "py-1.5")} role="tablist" aria-orientation="vertical" aria-label={label}>
       {links.map((l) => {
         const on = l === active;
         return (
@@ -88,7 +88,7 @@ function KpiTiles({ tiles }: { tiles: { value: string; label: string }[] }) {
 }
 
 /** A panel card. Chart cards pass `tools` and get the standard chart header (Edit, Export, Maximize). */
-function Section({
+export function Section({
   title,
   extra,
   onExpand,

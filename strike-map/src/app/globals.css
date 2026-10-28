@@ -66,6 +66,15 @@
   /* Ratio series on the DCA chart's right axis: GOR orange, WOR light blue. */
   --chart-gor: #d98a00;
   --chart-wor: #38a9db;
+  /* Categorical series (operators, formations…), fixed order; validated palette. */
+  --cat-1: #2a78d6;
+  --cat-2: #eb6834;
+  --cat-3: #1baf7a;
+  --cat-4: #eda100;
+  --cat-5: #e87ba4;
+  --cat-6: #008300;
+  --cat-7: #6250d6;
+  --cat-other: #9aa0a6;
 
   /* Aliases referenced by the prototype that the DS file doesn't define. */
   --error: var(--destructive);
@@ -90,6 +99,14 @@
   --chart-water: #4b8fd8;
   --chart-gor: #f5a623;
   --chart-wor: #7cc6f2;
+  --cat-1: #3987e5;
+  --cat-2: #d95926;
+  --cat-3: #199e70;
+  --cat-4: #c98500;
+  --cat-5: #d55181;
+  --cat-6: #008300;
+  --cat-7: #9085e9;
+  --cat-other: #6b7177;
   --shadow-soft: 0 1px 3px 0 rgb(0 0 0 / 0.35), 0 1px 2px -1px rgb(0 0 0 / 0.35);
   --shadow-overlay: 0 10px 15px -3px rgb(0 0 0 / 0.45), 0 4px 6px -4px rgb(0 0 0 / 0.45);
 }
