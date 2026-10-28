@@ -10,8 +10,10 @@ import { fmtDate, gapLabel, getWellDetails, type TimelineStep } from "@/lib/well
 import { cn } from "@/lib/utils";
 import { ProductionChart } from "./production-chart";
 import { SchematicInfo, WellboreSchematic, WellboreTables } from "./wellbore-view";
-import { getWellbore } from "@/lib/wellbore";
-import { DcaForecast, ResourceEstimates, useDca } from "./dca-view";
+import { getWellbore, type DataTable } from "@/lib/wellbore";
+import { downloadText, fileSafe } from "@/lib/download";
+import { ChartHeader, type ChartTools } from "./chart-header";
+import { DcaForecast, exportDcaCsv, ModifyDialog, ResourceEstimates, useDca } from "./dca-view";
 
 const eyebrow = "text-[11px] font-semibold tracking-[1px] text-s-muted uppercase";
 const card = "rounded-lg border border-s-line bg-s-card";
@@ -85,7 +87,27 @@ function KpiTiles({ tiles }: { tiles: { value: string; label: string }[] }) {
   );
 }
 
-function Section({ title, extra, onExpand, children }: { title: string; extra?: React.ReactNode; onExpand?: () => void; children: React.ReactNode }) {
+/** A panel card. Chart cards pass `tools` and get the standard chart header (Edit, Export, Maximize). */
+function Section({
+  title,
+  extra,
+  onExpand,
+  tools,
+  children,
+}: {
+  title: string;
+  extra?: React.ReactNode;
+  onExpand?: () => void;
+  tools?: ChartTools;
+  children: React.ReactNode;
+}) {
+  if (tools)
+    return (
+      <section className={cn(card, "px-3.5 py-3")} aria-label={title}>
+        <ChartHeader title={title} extra={extra} tools={tools} />
+        {children}
+      </section>
+    );
   return (
     <section className={cn(card, "px-3.5 py-3")}>
       <div className="mb-2 flex items-center justify-between">
@@ -151,6 +173,20 @@ function Metrics({ rows }: { rows: [string, string][] }) {
 }
 
 // ---- record (well / permit / rig) --------------------------------------------
+
+const ym = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+const csvCell = (v: string | number) => (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+
+function productionCsv(name: string, production: { month: Date; oil: number; gas: number; water: number }[]) {
+  return ["well,month,oil_bbl_d,gas_mcf_d,water_bbl_d", ...production.map((p) => [name, ym(p.month), p.oil.toFixed(2), p.gas.toFixed(2), p.water.toFixed(2)].map(csvCell).join(","))].join("\n");
+}
+
+/** Every wellbore table, one after another, each under its own label. */
+function wellboreCsv(name: string, tables: DataTable[]) {
+  return tables
+    .map((t) => [csvCell(`${name} — ${t.label}`), t.columns.map((c) => csvCell(c.label)).join(","), ...t.rows.map((r) => t.columns.map((c) => csvCell(r[c.key] ?? "")).join(","))].join("\n"))
+    .join("\n\n");
+}
 
 const WELL_ACTIONS = ["Evaluate this well", "View Wellbore & Completion Design", "Generate Decline Curve Analysis"];
 
@@ -235,8 +271,19 @@ export function RecordDetail({
       {showDetail && !isPermit && !isRig && <ActionLinks links={WELL_ACTIONS} active={view} onAction={setView} />}
       {showDetail && isDca ? (
         <>
-          <Section title="DCA Forecast" onExpand={dcaState.dca ? () => setExpanded("dca") : undefined}>
-            <DcaForecast production={det.production} wellName={well.name} state={dcaState} />
+          <Section
+            title="DCA Forecast"
+            tools={
+              dcaState.dca
+                ? {
+                    onEdit: () => dcaState.setModifyOpen(true),
+                    onExport: () => exportDcaCsv(well.name, det.production, dcaState.dca!),
+                    onMaximize: () => setExpanded("dca"),
+                  }
+                : {}
+            }
+          >
+            <DcaForecast production={det.production} state={dcaState} />
           </Section>
           {dcaState.dca && (
             <Section title="Resource Estimates">
@@ -245,7 +292,14 @@ export function RecordDetail({
           )}
         </>
       ) : showDetail && isWellbore ? (
-        <Section title="Wellbore & Completion Design" extra={<SchematicInfo />} onExpand={() => setExpanded("wellbore")}>
+        <Section
+          title="Wellbore & Completion Design"
+          extra={<SchematicInfo />}
+          tools={{
+            onExport: () => downloadText(`${fileSafe(well.name)}_wellbore.csv`, wellboreCsv(well.name, wellbore.tables)),
+            onMaximize: () => setExpanded("wellbore"),
+          }}
+        >
           <WellboreSchematic wb={wellbore} />
           <div className="mt-2">
             <WellboreTables tables={wellbore.tables} />
@@ -257,7 +311,24 @@ export function RecordDetail({
       {showDetail && !isWellbore && !isDca && (
         <>
           {hasProduction && (
-            <Section title="Production Decline" onExpand={det.production.length ? () => setExpanded("chart") : undefined}>
+            <Section
+              title="Production Decline"
+              tools={
+                det.production.length
+                  ? {
+                      // Editing production means adjusting its decline forecast.
+                      onEdit: dcaState.dca
+                        ? () => {
+                            setView(WELL_ACTIONS[2]);
+                            dcaState.setModifyOpen(true);
+                          }
+                        : undefined,
+                      onExport: () => downloadText(`${fileSafe(well.name)}_production.csv`, productionCsv(well.name, det.production)),
+                      onMaximize: () => setExpanded("chart"),
+                    }
+                  : {}
+              }
+            >
               <ProductionChart data={det.production} />
             </Section>
           )}
@@ -269,6 +340,7 @@ export function RecordDetail({
           </Section>
         </>
       )}
+      <ModifyDialog production={det.production} wellName={well.name} state={dcaState} />
       <Dialog open={expanded != null} onOpenChange={(o) => !o && setExpanded(null)}>
         <DialogContent className="w-[min(760px,94vw)] rounded-2xl">
           <div className="border-b border-border px-[22px] py-[18px] pr-14">
@@ -288,7 +360,7 @@ export function RecordDetail({
             {expanded === "timeline" && <Timeline steps={det.timeline} />}
             {expanded === "dca" && dcaState.dca && (
               <>
-                <DcaForecast production={det.production} wellName={well.name} state={dcaState} height={340} />
+                <DcaForecast production={det.production} state={dcaState} height={340} />
                 <div className="mt-4">
                   <ResourceEstimates dca={dcaState.dca} production={det.production} lateralFt={det.lateralFt} />
                 </div>

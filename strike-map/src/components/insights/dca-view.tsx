@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Download, Info, SlidersHorizontal } from "lucide-react";
+import { downloadText, fileSafe } from "@/lib/download";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -38,9 +39,15 @@ export function useDca(production: ProductionMonth[]) {
     setEndDate(undefined);
   };
   const modified = Object.keys(overrides).length > 0 || endDate != null;
-  return { dca, fitted, overrides, setOverrides, endDate, setEndDate, reset, modified };
+  // One Modify dialog per well, opened from the panel, the expanded view or the chart header.
+  const [modifyOpen, setModifyOpen] = React.useState(false);
+  return { dca, fitted, overrides, setOverrides, endDate, setEndDate, reset, modified, modifyOpen, setModifyOpen };
 }
 export type DcaState = ReturnType<typeof useDca>;
+
+export function exportDcaCsv(wellName: string, production: ProductionMonth[], dca: DcaResult) {
+  downloadText(`${fileSafe(wellName)}_dca.csv`, dcaCsv(wellName, production, dca));
+}
 
 function buildSeries(production: ProductionMonth[], dca: DcaResult) {
   const rates = STREAMS.map((s): DcaSeries => {
@@ -91,19 +98,8 @@ function ToggleChip({ on, label, unit, color, onClick }: { on: boolean; label: s
 }
 
 /** Legend toggles, the rate-time chart (plus GOR/WOR charts when on) and "Modify or Export Forecast". */
-export function DcaForecast({
-  production,
-  wellName,
-  state,
-  height = 180,
-}: {
-  production: ProductionMonth[];
-  wellName: string;
-  state: DcaState;
-  height?: number;
-}) {
+export function DcaForecast({ production, state, height = 180 }: { production: ProductionMonth[]; state: DcaState; height?: number }) {
   const [on, setOn] = React.useState<Record<Toggle, boolean>>({ oil: true, gas: true, water: true, gor: false, wor: false });
-  const [modifyOpen, setModifyOpen] = React.useState(false);
   const { dca } = state;
   const series = React.useMemo(() => (dca ? buildSeries(production, dca) : null), [production, dca]);
   if (!dca || !series) {
@@ -148,11 +144,10 @@ export function DcaForecast({
         </span>
         {state.modified && <span className="ml-auto font-medium text-primary">Modified</span>}
       </div>
-      <Button variant="outline" className="mt-2.5 w-full" onClick={() => setModifyOpen(true)}>
+      <Button variant="outline" className="mt-2.5 w-full" onClick={() => state.setModifyOpen(true)}>
         <SlidersHorizontal size={14} strokeWidth={1.75} />
         Modify or Export Forecast
       </Button>
-      <ModifyDialog open={modifyOpen} onOpenChange={setModifyOpen} production={production} wellName={wellName} state={state} />
     </div>
   );
 }
@@ -166,20 +161,8 @@ const toDraft = (dca: DcaResult): Draft =>
     }),
   ) as Draft;
 
-function ModifyDialog({
-  open,
-  onOpenChange,
-  production,
-  wellName,
-  state,
-}: {
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-  production: ProductionMonth[];
-  wellName: string;
-  state: DcaState;
-}) {
-  const { dca, fitted } = state;
+export function ModifyDialog({ production, wellName, state }: { production: ProductionMonth[]; wellName: string; state: DcaState }) {
+  const { dca, fitted, modifyOpen: open, setModifyOpen: onOpenChange } = state;
   const [draft, setDraft] = React.useState<Draft | null>(null);
   const [endYear, setEndYear] = React.useState("");
   React.useEffect(() => {
@@ -212,16 +195,6 @@ function ModifyDialog({
     state.setOverrides(overrides);
     state.setEndDate(yr === fitted.endDate.getFullYear() ? undefined : new Date(yr, fitted.endDate.getMonth(), 1));
     onOpenChange(false);
-  };
-  const exportCsv = () => {
-    const blob = new Blob([dcaCsv(wellName, production, dca)], { type: "text/csv" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${wellName.replace(/[^\w-]+/g, "_")}_dca.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
   const set = (s: Stream, k: keyof Draft[Stream], v: string) => setDraft((d) => (d ? { ...d, [s]: { ...d[s], [k]: v } } : d));
   const fields: { k: keyof Draft[Stream]; label: string }[] = [
@@ -290,7 +263,7 @@ function ModifyDialog({
           </label>
         </div>
         <div className="flex flex-wrap items-center gap-2 border-t border-border px-[22px] py-3">
-          <Button variant="ghost" onClick={exportCsv}>
+          <Button variant="ghost" onClick={() => exportDcaCsv(wellName, production, dca)}>
             <Download size={14} strokeWidth={1.75} />
             Export CSV
           </Button>
