@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,7 +25,7 @@ import type { Well } from "@/lib/strike-data";
 import { cn } from "@/lib/utils";
 import { fmtK, Legend, RangePlot, StackedAreaChart, StackedBarChart, TypeCurveChart } from "./area-charts";
 import { QuickInsights } from "./quick-insights";
-import { ChartToolButtons } from "./chart-header";
+import { InsightCard } from "./insight-card";
 import { downloadText } from "@/lib/download";
 import { ActionLinks, card, Section } from "./record-detail";
 
@@ -121,7 +120,6 @@ function Expandable({ title, render }: { title: string; render: (big: boolean) =
 function HistoricalProduction({ wells }: { wells: Well[] }) {
   const d = useDataset();
   const [stream, setStream] = React.useState<Stream>("oil");
-  const [open, setOpen] = React.useState(false);
   const data = React.useMemo(() => productionByGroup(d, wells, stream), [d, wells, stream]);
   const n = data.months.length;
   const [range, setRange] = React.useState<[number, number]>([0, Math.max(0, n - 1)]);
@@ -165,31 +163,19 @@ function HistoricalProduction({ wells }: { wells: Well[] }) {
     </>
   );
   return (
-    <>
-      <Card size="sm">
-        <CardHeader className="chart-header border-b border-orange-500">
-          <CardTitle className="min-w-0 truncate text-xs font-semibold whitespace-nowrap text-s-muted normal-case">{title}</CardTitle>
-          <CardAction>
-            <ChartToolButtons title={title} tools={{ onExport: exportCsv, onMaximize: () => setOpen(true) }} />
-          </CardAction>
-        </CardHeader>
-        <CardContent>{chart(false)}</CardContent>
-        <CardFooter>
-          <Legend groups={data.groups} className="mt-0" />
-        </CardFooter>
-      </Card>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="w-[min(960px,94vw)] rounded-2xl">
-          <div className="border-b border-border px-[22px] py-[18px] pr-14">
-            <DialogTitle className="text-lg font-semibold">{title}</DialogTitle>
-          </div>
-          <div className="max-h-[80vh] overflow-y-auto px-[22px] py-4">
-            {chart(true)}
-            <Legend groups={data.groups} />
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+    <InsightCard
+      title={title}
+      onExport={exportCsv}
+      renderExpanded={() => (
+        <>
+          {chart(true)}
+          <Legend groups={data.groups} />
+        </>
+      )}
+      footer={<Legend groups={data.groups} className="mt-0" />}
+    >
+      {chart(false)}
+    </InsightCard>
   );
 }
 
@@ -250,10 +236,28 @@ function SpudYear({ wells }: { wells: Well[] }) {
         </div>
       </div>
       <StackedBarChart years={years} groups={data.groups} values={values} height={big ? 340 : 170} />
-      <Legend groups={data.groups} />
     </>
   );
-  return <Expandable title={`Spud Year by ${GROUP_LABELS[by]}`} render={body} />;
+  const exportCsv = () => {
+    const q = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+    const rows = [["year", ...data.groups.map((g) => q(g.label))].join(","), ...years.map((yr, i) => [yr, ...values.map((v) => v[i])].join(","))];
+    downloadText(`spud_year_by_${by}.csv`, rows.join("\n"));
+  };
+  return (
+    <InsightCard
+      title={`Spud Year by ${GROUP_LABELS[by]}`}
+      onExport={exportCsv}
+      renderExpanded={() => (
+        <>
+          {body(true)}
+          <Legend groups={data.groups} />
+        </>
+      )}
+      footer={<Legend groups={data.groups} className="mt-0" />}
+    >
+      {body(false)}
+    </InsightCard>
+  );
 }
 
 function WellHistory({ wells }: { wells: Well[] }) {

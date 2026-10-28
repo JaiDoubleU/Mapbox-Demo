@@ -3,7 +3,7 @@
 import type { Well } from "@/lib/strike-data";
 import { CAT_COLOR } from "@/lib/area-insights";
 import { BarRow, topCounts } from "./panel-bits";
-import { Section } from "./record-detail";
+import { InsightCard } from "./insight-card";
 
 export interface InsightGroup {
   title: string;
@@ -13,7 +13,7 @@ export interface InsightGroup {
 /** Breakdown bars (status, operator, formation…). The top seven take colour slots in rank order. */
 export function QuickInsights({ items, groups, limit = 8 }: { items: Well[]; groups: InsightGroup[]; limit?: number }) {
   return (
-    <Section title="Quick Insights">
+    <InsightCard title="Quick Insights">
       {items.length === 0 ? (
         <p className="m-0 py-2 text-xs text-s-muted">Nothing to summarise here.</p>
       ) : (
@@ -36,6 +36,6 @@ export function QuickInsights({ items, groups, limit = 8 }: { items: Well[]; gro
           );
         })
       )}
-    </Section>
+    </InsightCard>
   );
 }
