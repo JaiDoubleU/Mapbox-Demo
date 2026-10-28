@@ -110,7 +110,7 @@ export function Section({
     );
   return (
     <section className={cn(card, "px-3.5 py-3")}>
-      <div className="chart-header flex items-center justify-between border-b border-orange-500 pb-2">
+      <div className="chart-header mb-2 flex items-center justify-between border-b border-orange-500 pb-2">
         <div className="flex items-center gap-1.5">
           <div className={eyebrow}>{title}</div>
           {extra}
