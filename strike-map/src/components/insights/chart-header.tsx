@@ -17,6 +17,37 @@ const TOOLS: { key: keyof ChartTools; label: string; icon: LucideIcon }[] = [
   { key: "onMaximize", label: "Maximize", icon: Maximize2 },
 ];
 
+/** The Edit / Export / Maximize icon buttons. A tool without a handler stays in place, disabled. */
+export function ChartToolButtons({ title, tools }: { title: string; tools: ChartTools }) {
+  return (
+    <div className="-mr-1 flex shrink-0 items-center gap-0.5" role="toolbar" aria-label={`${title} tools`}>
+      {TOOLS.map(({ key, label, icon: Icon }) => {
+        const run = tools[key];
+        const tip = run ? label : `${label} (not available for this chart)`;
+        return (
+          <Tooltip key={key}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label={`${label} ${title.toLowerCase()}`}
+                aria-disabled={!run || undefined}
+                onClick={run}
+                className={cn(
+                  "flex size-6 items-center justify-center rounded-md border-none bg-transparent p-0 outline-none focus-visible:ring-[3px] focus-visible:ring-primary/20",
+                  run ? "cursor-pointer text-s-muted hover:bg-s-chip hover:text-s-text" : "cursor-not-allowed text-s-faint",
+                )}
+              >
+                <Icon size={13} strokeWidth={1.75} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">{tip}</TooltipContent>
+          </Tooltip>
+        );
+      })}
+    </div>
+  );
+}
+
 /**
  * Standard header for chart containers: the chart name on the left; Edit, Export and Maximize
  * icon buttons on the right, each with a tooltip naming its action. A tool without a handler
@@ -29,31 +60,7 @@ export function ChartHeader({ title, extra, tools, className }: { title: string;
         <h3 className="m-0 truncate text-[11px] font-semibold text-s-muted uppercase">{title}</h3>
         {extra}
       </div>
-      <div className="-mr-1 flex shrink-0 items-center gap-0.5" role="toolbar" aria-label={`${title} tools`}>
-        {TOOLS.map(({ key, label, icon: Icon }) => {
-          const run = tools[key];
-          const tip = run ? label : `${label} (not available for this chart)`;
-          return (
-            <Tooltip key={key}>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  aria-label={`${label} ${title.toLowerCase()}`}
-                  aria-disabled={!run || undefined}
-                  onClick={run}
-                  className={cn(
-                    "flex size-6 items-center justify-center rounded-md border-none bg-transparent p-0 outline-none focus-visible:ring-[3px] focus-visible:ring-primary/20",
-                    run ? "cursor-pointer text-s-muted hover:bg-s-chip hover:text-s-text" : "cursor-not-allowed text-s-faint",
-                  )}
-                >
-                  <Icon size={13} strokeWidth={1.75} />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top">{tip}</TooltipContent>
-            </Tooltip>
-          );
-        })}
-      </div>
+      <ChartToolButtons title={title} tools={tools} />
     </div>
   );
 }

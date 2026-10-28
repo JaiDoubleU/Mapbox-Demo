@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -25,6 +26,8 @@ import type { Well } from "@/lib/strike-data";
 import { cn } from "@/lib/utils";
 import { fmtK, Legend, RangePlot, StackedAreaChart, StackedBarChart, TypeCurveChart } from "./area-charts";
 import { QuickInsights } from "./quick-insights";
+import { ChartToolButtons } from "./chart-header";
+import { downloadText } from "@/lib/download";
 import { ActionLinks, card, Section } from "./record-detail";
 
 export const WELL_AREA_ACTIONS = ["Understand Well History", "Benchmark Completions and Production", "Type Curve Creation", "Decline Curve Analysis"];
@@ -118,6 +121,7 @@ function Expandable({ title, render }: { title: string; render: (big: boolean) =
 function HistoricalProduction({ wells }: { wells: Well[] }) {
   const d = useDataset();
   const [stream, setStream] = React.useState<Stream>("oil");
+  const [open, setOpen] = React.useState(false);
   const data = React.useMemo(() => productionByGroup(d, wells, stream), [d, wells, stream]);
   const n = data.months.length;
   const [range, setRange] = React.useState<[number, number]>([0, Math.max(0, n - 1)]);
@@ -128,7 +132,17 @@ function HistoricalProduction({ wells }: { wells: Well[] }) {
   const months = data.months.slice(a, b + 1);
   const values = data.values.map((v) => v.slice(a, b + 1));
   const year = (i: number) => (n ? keyToDate(data.months[Math.max(0, i)]).getFullYear() : "—");
-  const body = (big: boolean) => (
+  const title = "Historical Production by Operator";
+  const exportCsv = () => {
+    const ym = (k: number) => `${Math.floor(k / 12)}-${String((k % 12) + 1).padStart(2, "0")}`;
+    const q = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+    const rows = [
+      ["month", ...data.groups.map((g) => q(g.label))].join(","),
+      ...data.months.map((m, i) => [ym(m), ...data.values.map((v) => v[i].toFixed(1))].join(",")),
+    ];
+    downloadText(`historical_production_${stream}.csv`, rows.join("\n"));
+  };
+  const chart = (big: boolean) => (
     <>
       <StreamTabs value={stream} onChange={setStream} />
       <StackedAreaChart months={months} groups={data.groups} values={values} unit={STREAM[stream].rate} height={big ? 380 : 190} />
@@ -148,43 +162,82 @@ function HistoricalProduction({ wells }: { wells: Well[] }) {
           <span className="rounded border border-s-line-strong px-1.5 py-0.5 text-[10px] text-s-text tabular-nums">{year(b)}</span>
         </div>
       )}
-      <Legend groups={data.groups} />
     </>
   );
-  return <Expandable title="Historical Production by Operator" render={body} />;
+  return (
+    <>
+      <Card className="gap-3 rounded-lg border-s-line bg-s-card py-3 shadow-none">
+        <CardHeader className="chart-header border-b border-orange-500 px-3.5 [.border-b]:pb-2">
+          <CardTitle className="text-[11px] font-semibold text-s-muted uppercase">{title}</CardTitle>
+          <CardDescription className="text-xs">
+            Daily {stream} rate by operator
+          </CardDescription>
+          <CardAction>
+            <ChartToolButtons title={title} tools={{ onExport: exportCsv, onMaximize: () => setOpen(true) }} />
+          </CardAction>
+        </CardHeader>
+        <CardContent className="px-3.5">{chart(false)}</CardContent>
+        <CardFooter className="px-3.5">
+          <Legend groups={data.groups} className="mt-0" />
+        </CardFooter>
+      </Card>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="w-[min(960px,94vw)] rounded-2xl">
+          <div className="border-b border-border px-[22px] py-[18px] pr-14">
+            <DialogTitle className="text-lg font-semibold">{title}</DialogTitle>
+          </div>
+          <div className="max-h-[80vh] overflow-y-auto px-[22px] py-4">
+            {chart(true)}
+            <Legend groups={data.groups} />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }
 
 function SpudYear({ wells }: { wells: Well[] }) {
   const [by, setBy] = React.useState<GroupBy>("operator");
   // Groups (and their colours) come from all wells, so narrowing the years never repaints them.
   const data = React.useMemo(() => spudByGroup(wells, by), [wells, by]);
-  const y0 = data.years[0] ?? 0, y1 = data.years[data.years.length - 1] ?? 0;
+  const y0 = data.years[0] ?? 0,
+    y1 = data.years[data.years.length - 1] ?? 0;
   const [from, setFrom] = React.useState(String(y0));
   const [to, setTo] = React.useState(String(y1));
   React.useEffect(() => {
     setFrom(String(y0));
     setTo(String(y1));
   }, [y0, y1]);
-  const f = Number(from) || y0, t = Number(to) || y1;
-  const lo = Math.max(y0, Math.min(f, t)), hi = Math.min(y1, Math.max(f, t));
-  const i0 = data.years.indexOf(lo), i1 = data.years.indexOf(hi);
+  const f = Number(from) || y0,
+    t = Number(to) || y1;
+  const lo = Math.max(y0, Math.min(f, t)),
+    hi = Math.min(y1, Math.max(f, t));
+  const i0 = data.years.indexOf(lo),
+    i1 = data.years.indexOf(hi);
   const years = i0 >= 0 && i1 >= 0 ? data.years.slice(i0, i1 + 1) : [];
   const values = data.values.map((v) => (i0 >= 0 && i1 >= 0 ? v.slice(i0, i1 + 1) : []));
   const changed = lo !== y0 || hi !== y1;
   const body = (big: boolean) => (
     <>
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <Picker
-          label="Group By:"
-          value={by}
-          options={(Object.keys(GROUP_LABELS) as GroupBy[]).map((k) => [k, GROUP_LABELS[k]])}
-          onChange={setBy}
-        />
+        <Picker label="Group By:" value={by} options={(Object.keys(GROUP_LABELS) as GroupBy[]).map((k) => [k, GROUP_LABELS[k]])} onChange={setBy} />
         <div className="flex items-center gap-1.5 text-xs text-s-text">
           Years:
-          <Input aria-label="From year" inputMode="numeric" value={from} onChange={(e) => setFrom(e.target.value)} className="h-7 w-[58px] px-1.5 text-xs tabular-nums" />
+          <Input
+            aria-label="From year"
+            inputMode="numeric"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="h-7 w-[58px] px-1.5 text-xs tabular-nums"
+          />
           to
-          <Input aria-label="To year" inputMode="numeric" value={to} onChange={(e) => setTo(e.target.value)} className="h-7 w-[58px] px-1.5 text-xs tabular-nums" />
+          <Input
+            aria-label="To year"
+            inputMode="numeric"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className="h-7 w-[58px] px-1.5 text-xs tabular-nums"
+          />
           <Button
             variant="outline"
             size="sm"
@@ -235,12 +288,7 @@ function Benchmarks({ wells }: { wells: Well[] }) {
     <>
       <div className="mb-2.5 flex flex-wrap gap-x-3 gap-y-2">
         <Picker label="Metric:" value={metric} options={(Object.keys(METRICS) as Metric[]).map((k) => [k, METRICS[k].label])} onChange={setMetric} />
-        <Picker
-          label="By:"
-          value={by}
-          options={(["operator", "formation"] as GroupBy[]).map((k) => [k, GROUP_LABELS[k]])}
-          onChange={setBy}
-        />
+        <Picker label="By:" value={by} options={(["operator", "formation"] as GroupBy[]).map((k) => [k, GROUP_LABELS[k]])} onChange={setBy} />
       </div>
       {res.overall.n > 0 && (
         <Kpis
@@ -262,7 +310,17 @@ function Benchmarks({ wells }: { wells: Well[] }) {
 
 // ---- Type curve & decline analysis -----------------------------------------------
 
-function CurveControls({ stream, setStream, normalize, setNormalize }: { stream: Stream; setStream: (s: Stream) => void; normalize: boolean; setNormalize: (v: boolean) => void }) {
+function CurveControls({
+  stream,
+  setStream,
+  normalize,
+  setNormalize,
+}: {
+  stream: Stream;
+  setStream: (s: Stream) => void;
+  normalize: boolean;
+  setNormalize: (v: boolean) => void;
+}) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
       <StreamTabs value={stream} onChange={setStream} />
