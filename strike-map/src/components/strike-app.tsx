@@ -108,6 +108,8 @@ export function StrikeApp() {
   additiveRef.current = additive;
   const layersRef = React.useRef(layers);
   layersRef.current = layers;
+  const densityRef = React.useRef(tweaks.density);
+  densityRef.current = tweaks.density;
 
   // Holding Shift makes shape selections add to the current selection.
   React.useEffect(() => {
@@ -136,7 +138,7 @@ export function StrikeApp() {
     (idx: number, ctrl: boolean) => {
       if (drawToolRef.current === "magic-wand") {
         const type = d.WELLS[idx].type;
-        const idxs = selectableWells(d, layersRef.current).filter((w) => w.type === type).map((w) => w.idx);
+        const idxs = selectableWells(d, layersRef.current, densityRef.current).filter((w) => w.type === type).map((w) => w.idx);
         selectMany(idxs, additiveRef.current);
         return;
       }
@@ -224,9 +226,9 @@ export function StrikeApp() {
               onEngine={setEngine}
             />
             {OVERLAY_TOOLS.includes(drawTool) && (
-              <DrawOverlay tool={drawTool} engine={engine} layers={layers} additive={additive} onSelectMulti={selectMany} />
+              <DrawOverlay tool={drawTool} engine={engine} layers={layers} density={tweaks.density} additive={additive} onSelectMulti={selectMany} />
             )}
-            {drawTool === "ai-select" && <AISelectOverlay layers={layers} additive={additive} onSelectMulti={selectMany} />}
+            {drawTool === "ai-select" && <AISelectOverlay layers={layers} density={tweaks.density} additive={additive} onSelectMulti={selectMany} />}
             <MapToolbar activeTool={drawTool} onTool={setDrawTool} />
             <LayersPanel open={layersOpen} onOpen={setLayersOpen} layers={layers} setLayer={setLayer} />
             <Legend open={legendOpen} onOpen={setLegendOpen} />

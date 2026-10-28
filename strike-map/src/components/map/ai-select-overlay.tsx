@@ -11,12 +11,13 @@ const SUGGESTIONS = ["Horizontal oil wells", "Pioneer wells", "Wolfcamp formatio
 
 interface AISelectOverlayProps {
   layers: Layers;
+  density: number;
   additive: boolean;
   onSelectMulti: (idxs: number[], additive: boolean) => void;
 }
 
 /** AI Select: click the map to open a prompt bar, then describe the records to select. */
-export function AISelectOverlay({ layers, additive, onSelectMulti }: AISelectOverlayProps) {
+export function AISelectOverlay({ layers, density, additive, onSelectMulti }: AISelectOverlayProps) {
   const data = useDataset();
   const [ready, setReady] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -68,7 +69,7 @@ export function AISelectOverlay({ layers, additive, onSelectMulti }: AISelectOve
     setPhase("thinking");
     timers.current.push(
       window.setTimeout(() => {
-        const idxs = aiSelect(selectableWells(data, layers), query);
+        const idxs = aiSelect(selectableWells(data, layers, density), query);
         setCount(idxs.length);
         if (idxs.length > 0) {
           setPhase("result");

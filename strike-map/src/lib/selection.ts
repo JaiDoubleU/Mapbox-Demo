@@ -1,6 +1,7 @@
 import { dist, pointInPoly, type Pt } from "./geo";
 import type { StrikeDataset, Well } from "./strike-data";
 import type { Layers } from "./types";
+import { passesDensity } from "@/components/map/engine";
 
 export type SelectionShape =
   | { type: "polygon"; pts: Pt[] }
@@ -9,9 +10,9 @@ export type SelectionShape =
   | { type: "ellipse"; cx: number; cy: number; rx: number; ry: number }
   | { type: "brush"; path: Pt[]; r: number };
 
-/** Only records in fully interactive layers can be selected (same rule as clicking). */
-export function selectableWells(d: StrikeDataset, layers: Layers): Well[] {
-  return d.WELLS.filter((w) => layers[d.CATS[w.cat].layer] === true);
+/** Only drawn records in fully interactive layers can be selected (same rule as clicking). */
+export function selectableWells(d: StrikeDataset, layers: Layers, density = 1): Well[] {
+  return d.WELLS.filter((w) => layers[d.CATS[w.cat].layer] === true && passesDensity(w.idx, density));
 }
 
 export function hitShape(p: Pt, shape: SelectionShape): boolean {
@@ -45,8 +46,14 @@ export function aiSelect(wells: Well[], q: string): number[] {
     { label: "dry hole", re: /\bdry/ },
     { label: "plugged & abandoned", re: /\bplug|\babandon|\bp&a\b/ },
   ];
-  const activeTypes = typeTests.filter((t) => t.re.test(lower)).map((t) => t.label);
-  const stops = new Set(["select", "find", "show", "get", "all", "the", "and", "or", "with", "that", "are", "have", "wells", "well", "from", "in", "on", "by", "for", "a", "an", "which", "where"]);
+  let activeTypes = typeTests.filter((t) => t.re.test(lower)).map((t) => t.label);
+  // "oil & gas wells" also trips the plain "gas wells" rule; it means only the combined type.
+  if (activeTypes.includes("oil & gas well")) activeTypes = activeTypes.filter((t) => t !== "gas well");
+  const stops = new Set([
+    "select", "find", "show", "get", "give", "all", "the", "and", "or", "with", "that", "are", "have", "wells",
+    "well", "from", "in", "on", "by", "for", "a", "an", "which", "where", "me", "near", "operated", "operator",
+    "operators", "formation", "formations", "field", "fields", "county", "basin", "records",
+  ]);
   const nameTokens = lower
     .split(/[\s,]+/)
     .filter(
@@ -61,11 +68,12 @@ export function aiSelect(wells: Well[], q: string): number[] {
       if (vt && w.orientation !== "Vertical") return false;
       if (activeTypes.length > 0) {
         const wt = w.type.toLowerCase();
-        if (!activeTypes.some((t) => wt.includes(t))) return false;
+        if (!activeTypes.includes(wt)) return false;
       }
+      // Every remaining word must match the operator, formation or field ("Pioneer in Wolfcamp").
       if (nameTokens.length > 0) {
         const hay = [w.operator, w.formation, w.field || w.name].join(" ").toLowerCase();
-        if (!nameTokens.some((t) => hay.includes(t)) && !hz && !vt && activeTypes.length === 0) return false;
+        if (!nameTokens.every((t) => hay.includes(t))) return false;
       }
       return true;
     })

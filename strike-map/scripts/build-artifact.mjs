@@ -10,13 +10,18 @@ import path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "..");
 
-// Pre-fill the page's token setting from NEXT_PUBLIC_MAPBOX_TOKEN (environment or .env).
+// Pre-fill the page's token setting from NEXT_PUBLIC_MAPBOX_TOKEN: the environment, then
+// .env.local, then .env (the same precedence Next.js uses).
 function envToken() {
   if (process.env.NEXT_PUBLIC_MAPBOX_TOKEN) return process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-  const file = path.join(root, ".env");
-  if (!fs.existsSync(file)) return "";
-  const m = fs.readFileSync(file, "utf8").match(/^NEXT_PUBLIC_MAPBOX_TOKEN=(.*)$/m);
-  return m ? m[1].trim().replace(/^["']|["']$/g, "") : "";
+  for (const name of [".env.local", ".env"]) {
+    const file = path.join(root, name);
+    if (!fs.existsSync(file)) continue;
+    const m = fs.readFileSync(file, "utf8").match(/^NEXT_PUBLIC_MAPBOX_TOKEN=(.*)$/m);
+    const v = m ? m[1].trim().replace(/^["']|["']$/g, "") : "";
+    if (v) return v;
+  }
+  return "";
 }
 const mapboxToken = envToken();
 const out = path.resolve(process.argv[2] ?? path.join(root, "dist-artifact/index.html"));

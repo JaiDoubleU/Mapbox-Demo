@@ -37,11 +37,20 @@ const ALL = [
 const PAD = 0.1;
 const bbox = [-102.92 - PAD, 31.74 - PAD, -102.18 + PAD, 32.2 + PAD];
 
+// Match the image's aspect ratio to the bbox in Web Mercator, so Mapbox doesn't pad the
+// image beyond the bbox the canvas engine stretches it into.
+const W = 1280;
+const mercY = (lat) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
+const H = Math.min(1280, Math.round((W * (mercY(bbox[3]) - mercY(bbox[1]))) / (((bbox[2] - bbox[0]) * Math.PI) / 180)));
+
 const styles = process.argv.includes("--all") ? ALL : DEFAULTS;
-const out = {};
+const file = path.join(root, "src/generated/basemap-images.json");
+// Keep images from earlier runs; only replace the styles fetched successfully now.
+const out = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};
+let fetched = 0;
 for (const style of styles) {
   const id = style.replace("mapbox://styles/", "");
-  const url = `https://api.mapbox.com/styles/v1/${id}/static/[${bbox.join(",")}]/1280x1100@2x?attribution=false&logo=false&access_token=${token}`;
+  const url = `https://api.mapbox.com/styles/v1/${id}/static/[${bbox.join(",")}]/${W}x${H}@2x?attribution=false&logo=false&access_token=${token}`;
   const res = await fetch(url);
   if (!res.ok) {
     console.error(`${style}: HTTP ${res.status} ${await res.text()}`);
@@ -49,8 +58,8 @@ for (const style of styles) {
   }
   const buf = Buffer.from(await res.arrayBuffer());
   out[style] = { bbox, src: `data:${res.headers.get("content-type") || "image/png"};base64,${buf.toString("base64")}` };
+  fetched++;
   console.log(`${style}: ${(buf.length / 1024).toFixed(0)} KB`);
 }
-const file = path.join(root, "src/generated/basemap-images.json");
 fs.writeFileSync(file, JSON.stringify(out));
-console.log(`wrote ${Object.keys(out).length} image(s) to ${file}`);
+console.log(`fetched ${fetched} image(s); ${Object.keys(out).length} stored in ${file}`);

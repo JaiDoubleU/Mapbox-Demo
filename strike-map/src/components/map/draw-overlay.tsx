@@ -18,13 +18,15 @@ interface DrawOverlayProps {
   tool: DrawToolId;
   engine: MapEngine | null;
   layers: Layers;
+  density: number;
   additive: boolean;
   onSelectMulti: (idxs: number[], additive: boolean) => void;
 }
 
 /** SVG capture layer for the shape-based selection tools (marquee, lasso, brush). */
-export function DrawOverlay({ tool, engine, layers, additive, onSelectMulti }: DrawOverlayProps) {
+export function DrawOverlay({ tool, engine, layers, density, additive, onSelectMulti }: DrawOverlayProps) {
   const data = useDataset();
+  const selectable = React.useMemo(() => selectableWells(data, layers, density), [data, layers, density]);
   const svgRef = React.useRef<SVGSVGElement>(null);
   const [polyPts, setPolyPts] = React.useState<Pt[]>([]);
   const [trace, setTrace] = React.useState<Pt[]>([]);
@@ -65,7 +67,7 @@ export function DrawOverlay({ tool, engine, layers, additive, onSelectMulti }: D
   const snapToWell = (pt: Pt): Pt => {
     if (!engine) return pt;
     let best: Pt | null = null, bestD = 35;
-    for (const w of data.WELLS) {
+    for (const w of selectable) {
       const p = engine.project(w.lng, w.lat), dd = dist(p, pt);
       if (dd < bestD) {
         bestD = dd;
@@ -77,7 +79,7 @@ export function DrawOverlay({ tool, engine, layers, additive, onSelectMulti }: D
 
   const runSel = (shape: SelectionShape) => {
     if (!engine) return;
-    const idxs = selectableWells(data, layers)
+    const idxs = selectable
       .filter((w) => hitShape(engine.project(w.lng, w.lat), shape))
       .map((w) => w.idx);
     onSelectMulti(idxs, additive);

@@ -151,16 +151,24 @@ export class MapboxMapEngine implements MapEngine {
     return !!this.map.getLayer("wells");
   }
 
+  /** Filter that hides records whose layer is switched off (rings follow it, like the canvas engine). */
+  private layerFilter(): unknown[] {
+    const hidden = (["wells", "permits", "rigs"] as const).filter((k) => this.opts.layers[k] === false);
+    return hidden.length ? ["!", ["in", ["get", "layer"], ["literal", hidden]]] : ["literal", true];
+  }
+
   /** Push layer visibility, view-only dimming, density and label tweaks into the style. */
   private apply() {
     if (!this.ready()) return;
     const map = this.map, L = this.opts.layers, tw = this.opts.tweaks;
-    const hidden = (["wells", "permits", "rigs"] as const).filter((k) => L[k] === false);
-    const filters: unknown[] = ["all"];
-    if (hidden.length) filters.push(["!", ["in", ["get", "layer"], ["literal", hidden]]]);
+    const r = tw.dotSize || 4;
+    const filters: unknown[] = ["all", this.layerFilter()];
     if (tw.density < 1) filters.push(["<", ["%", ["get", "idx"], 1000], tw.density * 1000]);
-    map.setFilter("wells", (filters.length > 1 ? filters : null) as mapboxgl.FilterSpecification | null);
+    map.setFilter("wells", filters as mapboxgl.FilterSpecification);
     map.setPaintProperty("wells", "circle-radius", this.dotRadius());
+    map.setPaintProperty("wells-sel", "circle-radius", r + 7);
+    map.setPaintProperty("wells-hover", "circle-radius", r + 5);
+    this.setSelected(this.selected);
     map.setPaintProperty("wells", "circle-opacity", [
       "case",
       ["==", ["get", "layer"], "wells"], L.wells === "view" ? 0.65 : 1,
@@ -214,7 +222,10 @@ export class MapboxMapEngine implements MapEngine {
   private applyHover() {
     if (!this.ready()) return;
     const show = this.opts.drawTool === "object-select" && this.hoverIdx != null;
-    this.map.setFilter("wells-hover", (show ? ["==", ["get", "idx"], this.hoverIdx] : NONE) as mapboxgl.FilterSpecification);
+    this.map.setFilter(
+      "wells-hover",
+      (show ? ["all", this.layerFilter(), ["==", ["get", "idx"], this.hoverIdx]] : NONE) as mapboxgl.FilterSpecification,
+    );
   }
 
   project(lng: number, lat: number): Pt {
@@ -236,7 +247,9 @@ export class MapboxMapEngine implements MapEngine {
 
   setSelected(idxs: number[]) {
     this.selected = idxs;
-    if (this.ready()) this.map.setFilter("wells-sel", idxIn(idxs) as mapboxgl.FilterSpecification);
+    if (this.ready()) {
+      this.map.setFilter("wells-sel", ["all", this.layerFilter(), idxIn(idxs)] as mapboxgl.FilterSpecification);
+    }
   }
 
   setSelectedLeases(idxs: number[]) {

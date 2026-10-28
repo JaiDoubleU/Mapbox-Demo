@@ -34,6 +34,8 @@ export function MapView(props: MapViewProps) {
   const hostRef = React.useRef<HTMLDivElement>(null);
   const engineRef = React.useRef<MapEngine | null>(null);
   const useMapbox = isValidMapboxToken(props.token);
+  // A different valid token rebuilds the Mapbox map (and retries after a canvas fallback).
+  const engineKey = useMapbox ? props.token : "canvas";
 
   // Callbacks are read through a ref so engines never hold stale closures.
   const latest = React.useRef(props);
@@ -106,9 +108,9 @@ export function MapView(props: MapViewProps) {
       latest.current.onEngine(null);
       host.innerHTML = "";
     };
-    // Re-create only when switching renderer, not on every token keystroke.
+    // Re-create only when the renderer or the Mapbox token changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [useMapbox, data]);
+  }, [engineKey, data]);
 
   const { theme, layers, tweaks, drawTool, lightBasemapStyle, darkBasemapStyle, selectedIdxs, selectedLeaseIdxs } = props;
   React.useEffect(() => {
