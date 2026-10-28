@@ -3,6 +3,7 @@
 import { List } from "lucide-react";
 import { useDataset } from "@/lib/dataset-context";
 import { LEASE_COLOR } from "@/components/map/engine";
+import { RIG_ICON_COLOR, RIG_ICON_PATH, RIG_ICON_VIEWBOX } from "@/lib/rig-icon";
 
 export function Legend({ open, onOpen }: { open: boolean; onOpen: (open: boolean) => void }) {
   const d = useDataset();
@@ -14,13 +15,13 @@ export function Legend({ open, onOpen }: { open: boolean; onOpen: (open: boolean
           <div className="flex flex-col gap-[9px]">
             {d.CAT_KEYS.map((k) => (
               <div key={k} className="flex items-center gap-2.5">
-                <span
-                  className="size-3 shrink-0 rounded-full"
-                  style={{
-                    background: d.CATS[k].color,
-                    boxShadow: k === "rig" ? `0 0 0 2px color-mix(in srgb, ${d.CATS[k].color} 40%, transparent)` : "none",
-                  }}
-                />
+                {k === "rig" ? (
+                  <svg viewBox={`0 0 ${RIG_ICON_VIEWBOX} ${RIG_ICON_VIEWBOX}`} className="-mx-0.5 size-4 shrink-0" aria-hidden="true">
+                    <path d={RIG_ICON_PATH} fill={RIG_ICON_COLOR} />
+                  </svg>
+                ) : (
+                  <span className="size-3 shrink-0 rounded-full" style={{ background: d.CATS[k].color }} />
+                )}
                 <span className="text-[13.5px] text-s-text">{d.CATS[k].label}</span>
               </div>
             ))}

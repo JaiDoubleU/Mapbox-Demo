@@ -20,7 +20,7 @@ export function CopyApiButton({ onCopy, size = "sm" }: { onCopy: (mode: ApiCopyM
               onClick={(e) => e.stopPropagation()}
               className={cn(
                 "inline-flex shrink-0 cursor-pointer items-center justify-center rounded-md border border-border bg-transparent font-medium text-foreground outline-none hover:bg-s-chip focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                md ? "h-9 gap-[7px] px-3.5 text-sm" : "h-5 gap-[5px] px-[7px] text-[11px]",
+                md ? "h-9 gap-[7px] px-3.5 text-sm" : "h-5 gap-[5px] px-[7px] text-xs",
               )}
             >
               <Copy size={md ? 15 : 12} strokeWidth={1.75} />

@@ -2,6 +2,7 @@ import type mapboxgl from "mapbox-gl";
 import type { Map as MapboxMap, MapMouseEvent } from "mapbox-gl";
 import type { Pt } from "@/lib/geo";
 import type { StrikeDataset } from "@/lib/strike-data";
+import { rigIconImage } from "@/lib/rig-icon";
 import { HOVER_PINK, LEASE_COLOR, isInteractive, type EngineOptions, type MapEngine } from "./engine";
 
 type MapboxModule = typeof mapboxgl;
@@ -25,7 +26,8 @@ function lateralsGeoJSON(d: StrikeDataset): GeoJSON.FeatureCollection {
     type: "FeatureCollection",
     features: d.LATERALS.map((l) => ({
       type: "Feature",
-      properties: { color: l.color },
+      // idx = the owning well, so selection filters work the same as for well dots.
+      properties: { color: l.color, idx: l.wellIdx, layer: d.CATS[d.WELLS[l.wellIdx]?.cat ?? "oil"].layer },
       geometry: { type: "LineString", coordinates: [l.a, l.b] },
     })),
   };
@@ -54,7 +56,11 @@ function gridGeoJSON(d: StrikeDataset): GeoJSON.FeatureCollection {
   };
 }
 
-const LAYER_IDS = ["grid", "laterals", "leases-fill", "leases-sel-fill", "leases-line", "leases-sel", "wells", "wells-sel", "wells-hover"];
+const LAYER_IDS = ["grid", "laterals-sel", "laterals", "leases-fill", "leases-sel-fill", "leases-line", "leases-sel", "wells", "rigs", "wells-sel", "wells-hover"];
+const RIG_IMAGE = "strike-rig";
+/** Rigs draw as the derrick icon on their own symbol layer; every other record is a circle. */
+const NOT_RIG = ["!=", ["get", "cat"], "rig"];
+const IS_RIG = ["==", ["get", "cat"], "rig"];
 
 /** Mapbox GL renderer. Mirrors the canvas engine's look and interaction rules. */
 export class MapboxMapEngine implements MapEngine {
@@ -65,6 +71,7 @@ export class MapboxMapEngine implements MapEngine {
   private styleUrl: string;
 
   private styleLoaded = false;
+  private resizeObserver: ResizeObserver;
   private failTimer: ReturnType<typeof setTimeout>;
 
   /** `onFail` fires if the first style never loads (bad token, blocked network, private style). */
@@ -97,6 +104,9 @@ export class MapboxMapEngine implements MapEngine {
       clearTimeout(this.failTimer);
       this.addLayers();
     });
+    // Follow container size changes (e.g. the mobile Insights sheet), not just window resizes.
+    this.resizeObserver = new ResizeObserver(() => this.map.resize());
+    this.resizeObserver.observe(container);
     this.map.on("click", (e) => this.onClick(e));
     this.map.on("mousemove", (e) => this.onMove(e));
   }
@@ -114,6 +124,12 @@ export class MapboxMapEngine implements MapEngine {
     return ["interpolate", ["linear"], ["zoom"], 8, 2, 12, r, 15, r + 3];
   }
 
+  /** Rig icon scale: 1 = 20px at the default dot size, following the dots' zoom ramp. */
+  private rigSize(): mapboxgl.ExpressionSpecification {
+    const r = this.opts.tweaks.dotSize || 4;
+    return ["interpolate", ["linear"], ["zoom"], 8, 0.55, 12, r / 4, 15, (r + 3) / 4];
+  }
+
   private addLayers() {
     const map = this.map, d = this.opts.data;
     if (map.getSource("wells")) return;
@@ -123,6 +139,12 @@ export class MapboxMapEngine implements MapEngine {
     map.addLayer({ id: "grid", type: "line", source: "grid", paint: { "line-color": this.opts.theme === "dark" ? "#ffffff" : "#000000", "line-opacity": 0.06, "line-width": 1 } });
 
     map.addSource("laterals", { type: "geojson", data: lateralsGeoJSON(d) });
+    // Halo under the selected wellbores (white) or the Object Selection hover (pink).
+    map.addLayer({
+      id: "laterals-sel", type: "line", source: "laterals", filter: NONE as mapboxgl.FilterSpecification,
+      layout: { "line-cap": "round" },
+      paint: { "line-color": "#fff", "line-width": 7 },
+    });
     map.addLayer({ id: "laterals", type: "line", source: "laterals", paint: { "line-color": ["get", "color"], "line-width": 2, "line-opacity": 0.85 } });
 
     map.addSource("leases", { type: "geojson", data: leasesGeoJSON(d) });
@@ -133,6 +155,12 @@ export class MapboxMapEngine implements MapEngine {
 
     map.addSource("wells", { type: "geojson", data: wellsGeoJSON(d) });
     map.addLayer({ id: "wells", type: "circle", source: "wells", paint: { "circle-radius": this.dotRadius(), "circle-color": ["get", "color"] } });
+    // The image is registered at 20 CSS px (2× pixels); icon-size scales it with zoom like the dots.
+    if (!map.hasImage(RIG_IMAGE)) map.addImage(RIG_IMAGE, rigIconImage(20, 2), { pixelRatio: 2 });
+    map.addLayer({
+      id: "rigs", type: "symbol", source: "wells", filter: IS_RIG as mapboxgl.FilterSpecification,
+      layout: { "icon-image": RIG_IMAGE, "icon-size": this.rigSize(), "icon-allow-overlap": true, "icon-ignore-placement": true },
+    });
     map.addLayer({
       id: "wells-sel", type: "circle", source: "wells", filter: NONE as mapboxgl.FilterSpecification,
       paint: { "circle-radius": r + 7, "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#fff", "circle-stroke-width": 2 },
@@ -164,7 +192,10 @@ export class MapboxMapEngine implements MapEngine {
     const r = tw.dotSize || 4;
     const filters: unknown[] = ["all", this.layerFilter()];
     if (tw.density < 1) filters.push(["<", ["%", ["get", "idx"], 1000], tw.density * 1000]);
-    map.setFilter("wells", filters as mapboxgl.FilterSpecification);
+    map.setFilter("wells", [...filters, NOT_RIG] as mapboxgl.FilterSpecification);
+    map.setFilter("rigs", [...filters, IS_RIG] as mapboxgl.FilterSpecification);
+    map.setLayoutProperty("rigs", "icon-size", this.rigSize());
+    map.setPaintProperty("rigs", "icon-opacity", L.rigs === "view" ? 0.65 : 1);
     map.setPaintProperty("wells", "circle-radius", this.dotRadius());
     map.setPaintProperty("wells-sel", "circle-radius", r + 7);
     map.setPaintProperty("wells-hover", "circle-radius", r + 5);
@@ -177,6 +208,11 @@ export class MapboxMapEngine implements MapEngine {
       1,
     ]);
     map.setLayoutProperty("laterals", "visibility", L.wells === false ? "none" : "visible");
+    map.setLayoutProperty("laterals-sel", "visibility", L.wells === false ? "none" : "visible");
+    map.setFilter(
+      "laterals",
+      (tw.density < 1 ? ["<", ["%", ["get", "idx"], 1000], tw.density * 1000] : null) as mapboxgl.FilterSpecification | null,
+    );
     map.setPaintProperty("laterals", "line-opacity", L.wells === "view" ? 0.65 : 0.85);
     const leaseVis = L.landtracLease === false ? "none" : "visible";
     ["leases-fill", "leases-sel-fill", "leases-line", "leases-sel"].forEach((id) => map.setLayoutProperty(id, "visibility", leaseVis));
@@ -193,9 +229,21 @@ export class MapboxMapEngine implements MapEngine {
 
   private interactiveWellAt(e: MapMouseEvent): number | null {
     if (!this.ready()) return null;
-    const hits = this.map.queryRenderedFeatures(e.point, { layers: ["wells"] });
+    // Rigs first: their icons sit on top of the dots.
+    const hits = this.map.queryRenderedFeatures(e.point, { layers: ["rigs", "wells"] });
     const hit = hits.find((f) => isInteractive(this.opts.layers, f.properties?.layer));
-    return hit ? (hit.properties!.idx as number) : null;
+    if (hit) return hit.properties!.idx as number;
+    // Laterals are thin, so accept clicks within 5px of the line.
+    const { x, y } = e.point;
+    const lines = this.map.queryRenderedFeatures(
+      [
+        [x - 5, y - 5],
+        [x + 5, y + 5],
+      ],
+      { layers: ["laterals"] },
+    );
+    const line = lines.find((f) => isInteractive(this.opts.layers, f.properties?.layer));
+    return line ? (line.properties!.idx as number) : null;
   }
 
   private onClick(e: MapMouseEvent) {
@@ -226,6 +274,7 @@ export class MapboxMapEngine implements MapEngine {
       "wells-hover",
       (show ? ["all", this.layerFilter(), ["==", ["get", "idx"], this.hoverIdx]] : NONE) as mapboxgl.FilterSpecification,
     );
+    this.applyLateralHighlight();
   }
 
   project(lng: number, lat: number): Pt {
@@ -249,7 +298,20 @@ export class MapboxMapEngine implements MapEngine {
     this.selected = idxs;
     if (this.ready()) {
       this.map.setFilter("wells-sel", ["all", this.layerFilter(), idxIn(idxs)] as mapboxgl.FilterSpecification);
+      this.applyLateralHighlight();
     }
+  }
+
+  /** Selected wellbores get a white halo and a thicker line; the Object Selection hover a pink halo. */
+  private applyLateralHighlight() {
+    if (!this.ready()) return;
+    const sel = ["literal", this.selected];
+    const hover = this.opts.drawTool === "object-select" ? this.hoverIdx : null;
+    const shown: unknown[] = ["any", ["in", ["get", "idx"], sel]];
+    if (hover != null) shown.push(["==", ["get", "idx"], hover]);
+    this.map.setFilter("laterals-sel", shown as mapboxgl.FilterSpecification);
+    this.map.setPaintProperty("laterals-sel", "line-color", ["case", ["in", ["get", "idx"], sel], "#ffffff", HOVER_PINK]);
+    this.map.setPaintProperty("laterals", "line-width", ["case", ["in", ["get", "idx"], sel], 3.5, 2]);
   }
 
   setSelectedLeases(idxs: number[]) {
@@ -262,6 +324,7 @@ export class MapboxMapEngine implements MapEngine {
 
   destroy() {
     clearTimeout(this.failTimer);
+    this.resizeObserver.disconnect();
     try {
       this.map.remove();
     } catch {

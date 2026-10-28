@@ -1,5 +1,6 @@
 import { BASEMAP_IMAGES } from "@/lib/basemap-images";
-import { pointInPoly, type Pt } from "@/lib/geo";
+import { distToSegment, pointInPoly, type Pt } from "@/lib/geo";
+import { drawRigIcon, rigIconPx } from "@/lib/rig-icon";
 import type { Lease, Well } from "@/lib/strike-data";
 import {
   CANVAS_PALETTES,
@@ -50,50 +51,65 @@ export class CanvasMapEngine implements MapEngine {
 
   private bind() {
     const cv = this.cv;
-    let dragging = false, lastX = 0, lastY = 0, moved = 0;
+    // Pointer events cover mouse, pen and touch: one pointer pans, two pointers pinch-zoom.
+    const pointers = new Map<number, { x: number; y: number }>();
+    let moved = 0;
+    let pinchDist = 0;
+    cv.style.touchAction = "none";
+    const local = (e: { clientX: number; clientY: number }) => {
+      const r = cv.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    };
+    const pinchState = () => {
+      const [a, b] = [...pointers.values()];
+      return { mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, d: Math.hypot(a.x - b.x, a.y - b.y) };
+    };
 
-    const ro = new ResizeObserver(() => this.resize());
-    ro.observe(cv);
-    this.cleanup.push(() => ro.disconnect());
-
-    this.listen(cv, "mousedown", (e) => {
-      dragging = true;
-      moved = 0;
-      lastX = e.clientX;
-      lastY = e.clientY;
+    this.listen(cv, "pointerdown", (e) => {
+      cv.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, local(e));
+      if (pointers.size === 1) moved = 0;
+      if (pointers.size === 2) pinchDist = pinchState().d;
       cv.style.cursor = "grabbing";
     });
-    this.listen(window, "mouseup", () => {
-      dragging = false;
-      cv.style.cursor = "grab";
-    });
-    this.listen(window, "mousemove", (e) => {
-      if (!dragging) return;
-      const dx = e.clientX - lastX, dy = e.clientY - lastY;
-      moved += Math.abs(dx) + Math.abs(dy);
-      lastX = e.clientX;
-      lastY = e.clientY;
-      const sLng = this.scale * Math.cos((this.cLat * Math.PI) / 180);
-      this.cLng -= dx / sLng;
-      this.cLat += dy / this.scale;
-      this.clamp();
-      this.draw();
-    });
-    this.listen(cv, "mousemove", (e) => {
-      if (dragging) return;
-      const r = cv.getBoundingClientRect();
-      const hit = this.hitWell(e.clientX - r.left, e.clientY - r.top);
-      const ni = hit ? hit.idx : null;
-      if (ni !== this.hoverIdx) {
-        this.hoverIdx = ni;
-        cv.style.cursor = ni != null ? "pointer" : "grab";
-        this.draw();
+    const release = (e: PointerEvent) => {
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) pinchDist = 0;
+      if (!pointers.size) cv.style.cursor = "grab";
+    };
+    this.listen(cv, "pointerup", release);
+    this.listen(cv, "pointercancel", release);
+    this.listen(cv, "pointermove", (e) => {
+      const pt = local(e);
+      const prev = pointers.get(e.pointerId);
+      if (!prev) {
+        // Hover (mouse/pen only): pointer cursor and the Object Selection highlight.
+        const hit = this.hitWell(pt.x, pt.y);
+        const ni = hit ? hit.idx : null;
+        if (ni !== this.hoverIdx) {
+          this.hoverIdx = ni;
+          cv.style.cursor = ni != null ? "pointer" : "grab";
+          this.draw();
+        }
+        return;
       }
+      if (pointers.size === 2) {
+        const before = pinchState();
+        pointers.set(e.pointerId, pt);
+        const after = pinchState();
+        moved += 10; // a pinch is never a tap
+        if (pinchDist > 0 && before.d > 0) this.zoomAt(after.mid.x, after.mid.y, after.d / before.d);
+        this.panBy(after.mid.x - before.mid.x, after.mid.y - before.mid.y);
+        return;
+      }
+      const dx = pt.x - prev.x, dy = pt.y - prev.y;
+      pointers.set(e.pointerId, pt);
+      moved += Math.abs(dx) + Math.abs(dy);
+      this.panBy(dx, dy);
     });
     this.listen(cv, "click", (e) => {
       if (moved > 5) return;
-      const r = cv.getBoundingClientRect();
-      const x = e.clientX - r.left, y = e.clientY - r.top;
+      const { x, y } = local(e);
       const ctrl = e.ctrlKey || e.metaKey;
       const hit = this.hitWell(x, y);
       if (hit) return this.opts.onSelect(hit.idx, ctrl);
@@ -106,18 +122,30 @@ export class CanvasMapEngine implements MapEngine {
       "wheel",
       (e) => {
         e.preventDefault();
-        const r = cv.getBoundingClientRect();
-        const mx = e.clientX - r.left, my = e.clientY - r.top;
-        const before = this.unproject(mx, my);
-        this.scale = Math.max(900, Math.min(40000, this.scale * Math.pow(1.0015, -e.deltaY)));
-        const after = this.unproject(mx, my);
-        this.cLng += before.lng - after.lng;
-        this.cLat += before.lat - after.lat;
-        this.clamp();
-        this.draw();
+        const { x, y } = local(e);
+        this.zoomAt(x, y, Math.pow(1.0015, -e.deltaY));
       },
       { passive: false },
     );
+  }
+
+  private panBy(dx: number, dy: number) {
+    const sLng = this.scale * Math.cos((this.cLat * Math.PI) / 180);
+    this.cLng -= dx / sLng;
+    this.cLat += dy / this.scale;
+    this.clamp();
+    this.draw();
+  }
+
+  /** Zoom by `factor`, keeping the point under (mx, my) fixed. */
+  private zoomAt(mx: number, my: number, factor: number) {
+    const before = this.unproject(mx, my);
+    this.scale = Math.max(900, Math.min(40000, this.scale * factor));
+    const after = this.unproject(mx, my);
+    this.cLng += before.lng - after.lng;
+    this.cLat += before.lat - after.lat;
+    this.clamp();
+    this.draw();
   }
 
   private clamp() {
@@ -151,14 +179,29 @@ export class CanvasMapEngine implements MapEngine {
     const { data: d, layers, tweaks } = this.opts;
     const rad = (tweaks.dotSize || 4) + 5;
     let best: Well | null = null, bestD = rad * rad;
+    const rigBonus = Math.max(0, (rigIconPx(tweaks.dotSize || 4) / 2 + 2) ** 2 - rad * rad);
     for (const w of d.WELLS) {
       if (!isInteractive(layers, d.CATS[w.cat].layer)) continue;
       if (!passesDensity(w.idx, tweaks.density)) continue;
       const p = this.project(w.lng, w.lat);
       if (p.x < -10 || p.x > this.W + 10 || p.y < -10 || p.y > this.H + 10) continue;
-      const dd = (p.x - x) ** 2 + (p.y - y) ** 2;
+      // The rig icon is larger than a dot, so its hit area is too (and it wins ties, being on top).
+      const dd = (p.x - x) ** 2 + (p.y - y) ** 2 - (w.cat === "rig" ? rigBonus : 0);
       if (dd < bestD) {
         bestD = dd;
+        best = w;
+      }
+    }
+    if (best) return best;
+    // No dot under the pointer: try the horizontal wellbores (laterals) within 5px.
+    const pt = { x, y };
+    let lineD = 5;
+    for (const l of d.LATERALS) {
+      const w = d.WELLS[l.wellIdx];
+      if (!w || !isInteractive(layers, d.CATS[w.cat].layer) || !passesDensity(w.idx, tweaks.density)) continue;
+      const dd = distToSegment(pt, this.project(l.a[0], l.a[1]), this.project(l.b[0], l.b[1]));
+      if (dd < lineD) {
+        lineD = dd;
         best = w;
       }
     }
@@ -288,9 +331,27 @@ export class CanvasMapEngine implements MapEngine {
     if (layers.wells !== false) {
       ctx.lineWidth = 2.2;
       ctx.globalAlpha = layers.wells === "view" ? 0.65 * 0.9 : 0.9;
+      const sel = new Set(this.selected);
+      const hoverLine = this.opts.drawTool === "object-select" ? this.hoverIdx : null;
       d.LATERALS.forEach((l) => {
+        if (!passesDensity(l.wellIdx, tw.density)) return;
         const a = this.project(l.a[0], l.a[1]), b = this.project(l.b[0], l.b[1]);
+        const picked = sel.has(l.wellIdx), hovered = hoverLine === l.wellIdx;
+        if (picked || hovered) {
+          // Selected (or Object Selection hover) wellbore: halo under a thicker line.
+          ctx.save();
+          ctx.globalAlpha = 1;
+          ctx.lineCap = "round";
+          ctx.lineWidth = 7;
+          ctx.strokeStyle = hovered && !picked ? HOVER_PINK : "#fff";
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+          ctx.restore();
+        }
         ctx.strokeStyle = l.color;
+        ctx.lineWidth = picked ? 3.5 : 2.2;
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
@@ -299,16 +360,28 @@ export class CanvasMapEngine implements MapEngine {
       ctx.globalAlpha = 1;
     }
 
-    // well dots
+    // well dots; active rigs are drawn afterwards as the derrick icon, on top
+    const rigs: Well[] = [];
     for (const w of d.WELLS) {
       if (!passesDensity(w.idx, tw.density) || !visible(w)) continue;
+      if (w.cat === "rig") {
+        rigs.push(w);
+        continue;
+      }
       const p = this.project(w.lng, w.lat);
       if (p.x < -8 || p.x > this.W + 8 || p.y < -8 || p.y > this.H + 8) continue;
       ctx.globalAlpha = layers[d.CATS[w.cat].layer] === "view" ? 0.65 : 1;
       ctx.fillStyle = d.CATS[w.cat].color;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, w.cat === "rig" ? r + 1.5 : r, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
       ctx.fill();
+    }
+    const rigPx = rigIconPx(r);
+    ctx.globalAlpha = layers.rigs === "view" ? 0.65 : 1;
+    for (const w of rigs) {
+      const p = this.project(w.lng, w.lat);
+      if (p.x < -rigPx || p.x > this.W + rigPx || p.y < -rigPx || p.y > this.H + rigPx) continue;
+      drawRigIcon(ctx, p.x, p.y, rigPx);
     }
     ctx.globalAlpha = 1;
 
@@ -340,14 +413,16 @@ export class CanvasMapEngine implements MapEngine {
       const w = d.WELLS[selIdx];
       if (!w || !visible(w)) return;
       const p = this.project(w.lng, w.lat);
+      // Rings clear the rig icon, which is larger than a dot.
+      const ring = w.cat === "rig" ? rigIconPx(r) / 2 + 3 : r + 6;
       ctx.lineWidth = 2;
       ctx.strokeStyle = "#fff";
       ctx.beginPath();
-      ctx.arc(p.x, p.y, r + 6, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, ring, 0, Math.PI * 2);
       ctx.stroke();
       ctx.strokeStyle = d.CATS[w.cat].color;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, r + 9, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, ring + 3, 0, Math.PI * 2);
       ctx.stroke();
     });
 

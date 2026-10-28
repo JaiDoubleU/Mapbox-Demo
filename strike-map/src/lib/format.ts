@@ -1,5 +1,5 @@
 import type { StrikeDataset, Well } from "./strike-data";
-import type { ApiCopyMode, Layers } from "./types";
+import type { ApiCopyMode } from "./types";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -23,12 +23,6 @@ export function isWell(d: StrikeDataset, w: Well) {
 /** Newline-separated API numbers, either "42-329-30742" or digits only. */
 export function buildApiList(wells: Well[], mode: ApiCopyMode): string {
   return wells.map((w) => (mode === "unformatted" ? w.api.replace(/[^0-9]/g, "") : w.api)).join("\n");
-}
-
-/** Wells to use for "Copy API List": the selection if any, otherwise interactive wells on the map. */
-export function wellsForApiCopy(d: StrikeDataset, records: Well[], layers: Layers): Well[] {
-  if (records.length) return records.filter((r) => isWell(d, r));
-  return d.WELLS.filter((w) => isWell(d, w) && layers.wells === true);
 }
 
 export const API_COPIED_MESSAGE = "API list copied — paste with Ctrl+V (⌘V on Mac)";

@@ -57,7 +57,7 @@ export function LayersPanel({ open, onOpen, layers, setLayer }: LayersPanelProps
         Layers
       </button>
       {open && (
-        <div className="mt-2.5 w-80 rounded-xl border border-border bg-card p-3.5 shadow-[var(--shadow-overlay)]">
+        <div className="mt-2.5 max-h-[calc(100%-64px)] w-[min(20rem,calc(100vw-5.5rem))] overflow-y-auto rounded-xl border border-border bg-card p-3.5 shadow-[var(--shadow-overlay)]">
           <div className="px-1 pt-0.5 pb-3 text-xs font-semibold tracking-[1.2px] text-s-muted">LAYERS</div>
           <div className="flex flex-col gap-1">
             <LayerRow isAll label="All Layers" />

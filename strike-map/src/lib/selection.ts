@@ -33,6 +33,20 @@ export function hitShape(p: Pt, shape: SelectionShape): boolean {
   }
 }
 
+/**
+ * True when the well's surface location, or any part of its mapped lateral, falls inside the
+ * shape — so a marquee or lasso drawn across a wellbore selects that well.
+ */
+export function wellInShape(d: StrikeDataset, w: Well, project: (lng: number, lat: number) => Pt, shape: SelectionShape): boolean {
+  if (hitShape(project(w.lng, w.lat), shape)) return true;
+  if (w.lateralIdx == null) return false;
+  const l = d.LATERALS[w.lateralIdx];
+  for (let t = 0.25; t <= 1.0001; t += 0.25) {
+    if (hitShape(project(l.a[0] + (l.b[0] - l.a[0]) * t, l.a[1] + (l.b[1] - l.a[1]) * t), shape)) return true;
+  }
+  return false;
+}
+
 /** Keyword-based stand-in for AI selection: orientation, well type, and operator/formation/field tokens. */
 export function aiSelect(wells: Well[], q: string): number[] {
   const lower = q.toLowerCase();

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { dist, type Pt } from "@/lib/geo";
 import { useDataset } from "@/lib/dataset-context";
-import { hitShape, selectableWells, type SelectionShape } from "@/lib/selection";
+import { selectableWells, wellInShape, type SelectionShape } from "@/lib/selection";
 import type { DrawToolId, Layers } from "@/lib/types";
 import type { MapEngine } from "./engine";
 
@@ -59,7 +59,7 @@ export function DrawOverlay({ tool, engine, layers, density, additive, onSelectM
     return () => window.removeEventListener("keydown", onKey);
   }, [reset]);
 
-  const sv = (e: React.MouseEvent): Pt => {
+  const sv = (e: React.PointerEvent | React.MouseEvent): Pt => {
     const r = svgRef.current!.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
@@ -79,16 +79,22 @@ export function DrawOverlay({ tool, engine, layers, density, additive, onSelectM
 
   const runSel = (shape: SelectionShape) => {
     if (!engine) return;
+    const project = (lng: number, lat: number) => engine.project(lng, lat);
     const idxs = selectable
-      .filter((w) => hitShape(engine.project(w.lng, w.lat), shape))
+      .filter((w) => wellInShape(data, w, project, shape))
       .map((w) => w.idx);
     onSelectMulti(idxs, additive);
   };
 
-  // --- polygonal lasso: click to drop anchors, double-click to close
+  // --- polygonal lasso: click to drop anchors; double-click, or tap the first anchor, to close
   const onPolyClick = (e: React.MouseEvent) => {
     if (e.detail >= 2) return;
     const pt = sv(e);
+    if (polyPts.length >= 3 && dist(pt, polyPts[0]) < 18) {
+      runSel({ type: "polygon", pts: polyPts });
+      setPolyPts([]);
+      return;
+    }
     setPolyPts((p) => p.concat(pt));
   };
   const onPolyDbl = () => {
@@ -97,17 +103,17 @@ export function DrawOverlay({ tool, engine, layers, density, additive, onSelectM
   };
 
   // --- marquees: drag (Shift locks square / circle)
-  const onDragDown = (e: React.MouseEvent) => {
+  const onDragDown = (e: React.PointerEvent) => {
     const pt = sv(e);
     setDragSt(pt);
     setDragCur(pt);
   };
-  const onDragMove = (e: React.MouseEvent) => {
+  const onDragMove = (e: React.PointerEvent) => {
     if (!dragSt) return;
     setShift(e.shiftKey);
     setDragCur(sv(e));
   };
-  const onDragUp = (e: React.MouseEvent) => {
+  const onDragUp = (e: React.PointerEvent) => {
     const st = dragSt;
     if (!st) return;
     let en = sv(e);
@@ -127,14 +133,14 @@ export function DrawOverlay({ tool, engine, layers, density, additive, onSelectM
   };
 
   // --- lasso / magnetic lasso / brush: press and trace
-  const onPathDown = (e: React.MouseEvent) => {
+  const onPathDown = (e: React.PointerEvent) => {
     const pt = sv(e);
     const p = isMag ? snapToWell(pt) : pt;
     traceRef.current = [p];
     setTrace([p]);
     setTracing(true);
   };
-  const onPathMove = (e: React.MouseEvent) => {
+  const onPathMove = (e: React.PointerEvent) => {
     if (!tracing) return;
     const pt = sv(e);
     const p = isMag ? snapToWell(pt) : pt;
@@ -166,17 +172,23 @@ export function DrawOverlay({ tool, engine, layers, density, additive, onSelectM
   return (
     <svg
       ref={svgRef}
-      className="absolute inset-0 z-[55] h-full w-full cursor-crosshair overflow-visible"
+      className="absolute inset-0 z-[55] h-full w-full cursor-crosshair touch-none overflow-visible"
       onClick={isPoly ? onPolyClick : undefined}
       onDoubleClick={isPoly ? onPolyDbl : undefined}
-      onMouseDown={isDrag ? onDragDown : isPath ? onPathDown : undefined}
-      onMouseMove={(e) => {
+      onPointerDown={(e) => {
+        // Capture so a drag keeps reporting moves (touch and mouse) until it's released.
+        if (isDrag || isPath) e.currentTarget.setPointerCapture(e.pointerId);
+        if (isDrag) onDragDown(e);
+        else if (isPath) onPathDown(e);
+      }}
+      onPointerMove={(e) => {
         setMouse(sv(e));
         if (isDrag) onDragMove(e);
         else if (isPath) onPathMove(e);
       }}
-      onMouseUp={isDrag ? onDragUp : isPath ? onPathUp : undefined}
-      onMouseLeave={() => setMouse(null)}
+      onPointerUp={isDrag ? onDragUp : isPath ? onPathUp : undefined}
+      onPointerCancel={() => reset()}
+      onPointerLeave={(e) => e.pointerType === "mouse" && setMouse(null)}
     >
       {isPoly && polyPts.length > 0 && (
         <g>
