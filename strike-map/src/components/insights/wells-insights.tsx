@@ -166,15 +166,15 @@ function HistoricalProduction({ wells }: { wells: Well[] }) {
   );
   return (
     <>
-      <Card className="gap-3 rounded-lg border-s-line bg-s-card py-3 shadow-none">
-        <CardHeader className="chart-header border-b border-orange-500 px-3.5 [.border-b]:pb-2">
+      <Card size="sm">
+        <CardHeader className="chart-header border-b border-orange-500">
           <CardTitle className="min-w-0 truncate text-xs font-semibold whitespace-nowrap text-s-muted normal-case">{title}</CardTitle>
           <CardAction>
             <ChartToolButtons title={title} tools={{ onExport: exportCsv, onMaximize: () => setOpen(true) }} />
           </CardAction>
         </CardHeader>
-        <CardContent className="px-3.5">{chart(false)}</CardContent>
-        <CardFooter className="px-3.5">
+        <CardContent>{chart(false)}</CardContent>
+        <CardFooter>
           <Legend groups={data.groups} className="mt-0" />
         </CardFooter>
       </Card>
