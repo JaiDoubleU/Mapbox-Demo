@@ -168,7 +168,7 @@ function HistoricalProduction({ wells }: { wells: Well[] }) {
     <>
       <Card className="gap-3 rounded-lg border-s-line bg-s-card py-3 shadow-none">
         <CardHeader className="chart-header border-b border-orange-500 px-3.5 [.border-b]:pb-2">
-          <CardTitle className="text-[11px] font-semibold text-s-muted uppercase">{title}</CardTitle>
+          <CardTitle className="min-w-0 truncate text-[11px] font-semibold whitespace-nowrap text-s-muted normal-case">{title}</CardTitle>
           <CardAction>
             <ChartToolButtons title={title} tools={{ onExport: exportCsv, onMaximize: () => setOpen(true) }} />
           </CardAction>
