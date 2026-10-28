@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -169,9 +169,6 @@ function HistoricalProduction({ wells }: { wells: Well[] }) {
       <Card className="gap-3 rounded-lg border-s-line bg-s-card py-3 shadow-none">
         <CardHeader className="chart-header border-b border-orange-500 px-3.5 [.border-b]:pb-2">
           <CardTitle className="text-[11px] font-semibold text-s-muted uppercase">{title}</CardTitle>
-          <CardDescription className="text-xs">
-            Daily {stream} rate by operator
-          </CardDescription>
           <CardAction>
             <ChartToolButtons title={title} tools={{ onExport: exportCsv, onMaximize: () => setOpen(true) }} />
           </CardAction>
