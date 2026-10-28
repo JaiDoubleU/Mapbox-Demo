@@ -16,7 +16,7 @@ import { ChartHeader, type ChartTools } from "./chart-header";
 import { DcaForecast, exportDcaCsv, ModifyDialog, ResourceEstimates, useDca } from "./dca-view";
 
 export const eyebrow = "text-[11px] font-semibold text-s-muted uppercase";
-export const card = "rounded-lg border border-s-line bg-s-card";
+export const card = "card";
 const n0 = (v: number) => Math.round(v).toLocaleString("en-US");
 const n1 = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const n2 = (v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

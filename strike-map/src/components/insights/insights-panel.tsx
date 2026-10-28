@@ -283,7 +283,7 @@ export function InsightsPanel({
                     />
                   )}
                   {!sheet && <div className={cn(eyebrow, "mb-2.5")}>Explore this Area</div>}
-                  <div className={cn("flex gap-2", showDetail ? "mb-5" : "mb-1")}>
+                  <div className={cn("flex gap-2", showDetail ? "mb-2.5" : "mb-1")}>
                     {wellsData.length > 0 && <SummaryTile value={wellsData.length} label={sel("Wells")} />}
                     {permitsData.length > 0 && <SummaryTile value={permitsData.length} label={sel("Permits")} />}
                     {rigsData.length > 0 && <SummaryTile value={rigsData.length} label={sel("Active Rigs")} />}
@@ -293,7 +293,7 @@ export function InsightsPanel({
                   </div>
 
                   {showDetail && wellsData.length > 0 && typeEntries.length > 0 && (
-                    <section className="mb-5">
+                    <section className="card mb-2.5 px-3.5 py-3 [&>:last-child]:mb-0">
                       <div className={cn(eyebrow, "mb-2.5")}>Well Types</div>
                       {typeEntries.map(([type, count]) => (
                         <BarRow
@@ -310,7 +310,7 @@ export function InsightsPanel({
                   )}
 
                   {showDetail && topOps.length > 0 && (
-                    <section className="mb-5 border-t border-s-line pt-4">
+                    <section className="card mb-2.5 px-3.5 py-3 [&>:last-child]:mb-0">
                       <div className={cn(eyebrow, "mb-2.5")}>Top Operators</div>
                       {topOps.map(([op, count]) => (
                         <BarRow key={op} label={op} count={count} max={topOps[0][1]} color="var(--primary)" barWidth={60} countWidth={36} />
@@ -319,7 +319,7 @@ export function InsightsPanel({
                   )}
 
                   {showDetail && wellsData.length > 0 && topForms.length > 0 && (
-                    <section className="mb-5 border-t border-s-line pt-4">
+                    <section className="card mb-2.5 px-3.5 py-3 [&>:last-child]:mb-0">
                       <div className={cn(eyebrow, "mb-2.5")}>Formations</div>
                       {topForms.map(([form, count]) => (
                         <BarRow key={form} label={form} count={count} max={topForms[0][1]} color="#3b9ae1" labelWidth={120} />
@@ -328,14 +328,14 @@ export function InsightsPanel({
                   )}
 
                   {showDetail && wellsData.length > 0 && horizCount + vertCount > 0 && (
-                    <section className="mb-2 border-t border-s-line pt-4">
+                    <section className="card mb-2 px-3.5 py-3 [&>:last-child]:mb-0">
                       <div className={cn(eyebrow, "mb-2.5")}>Orientation</div>
                       <div className="flex gap-2">
                         {[
                           [horizCount, "Horizontal"],
                           [vertCount, "Vertical"],
                         ].map(([n, label]) => (
-                          <div key={label} className="flex-1 rounded-md border border-s-line bg-s-card px-3 py-2">
+                          <div key={label} className="flex-1 rounded-md border border-s-line bg-s-bg px-3 py-2">
                             <div className="text-lg leading-none font-bold text-s-text">{n.toLocaleString()}</div>
                             <div className="mt-1 text-[11px] text-s-muted">{label}</div>
                           </div>

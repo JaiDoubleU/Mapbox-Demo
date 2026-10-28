@@ -111,6 +111,13 @@
   --shadow-overlay: 0 10px 15px -3px rgb(0 0 0 / 0.45), 0 4px 6px -4px rgb(0 0 0 / 0.45);
 }
 
+@layer components {
+  /* Panel card: the surface used by every section in the Insights panel. */
+  .card {
+    @apply rounded-lg border border-s-line bg-s-card;
+  }
+}
+
 @layer base {
   * {
     box-sizing: border-box;
