@@ -7,7 +7,6 @@ import type { Well } from "@/lib/strike-data";
 import type { ApiCopyMode, Layers } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { CopyApiButton } from "@/components/chrome/copy-api-button";
 import {
   ExportOptionsPopover,
   initialChecks,
@@ -220,8 +219,8 @@ export function InsightsPanel({
       ],
     });
 
-  const copyApiWells = hasRecordSel ? records.filter((w) => layerOf(w) === "wells") : exportWells;
-  const copyApi = (mode: ApiCopyMode) => onCopyApi(menuOpen ? exportWells : copyApiWells, mode);
+  // Copy API List now lives only in the Export Options popover.
+  const copyApi = (mode: ApiCopyMode) => onCopyApi(exportWells, mode);
 
   return (
     <div
@@ -348,7 +347,6 @@ export function InsightsPanel({
         >
           Export Options...
         </Button>
-        <CopyApiButton size="md" onCopy={copyApi} />
       </div>
     </div>
   );

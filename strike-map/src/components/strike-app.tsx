@@ -20,7 +20,7 @@ import { useTweaks } from "@/hooks/use-tweaks";
 import { MOBILE_QUERY, useMediaQuery } from "@/hooks/use-media-query";
 import { CURRENT_USER_INITIALS, DEFAULT_DARK_STYLE, DEFAULT_LIGHT_STYLE, ENV_MAPBOX_TOKEN } from "@/lib/config";
 import { useDataset } from "@/lib/dataset-context";
-import { API_COPIED_MESSAGE, buildApiList, copyToClipboard, fmtJobTime, wellsForApiCopy } from "@/lib/format";
+import { API_COPIED_MESSAGE, buildApiList, copyToClipboard, fmtJobTime } from "@/lib/format";
 import { selectableWells } from "@/lib/selection";
 import type { Well } from "@/lib/strike-data";
 import { DEFAULT_LAYERS, type ApiCopyMode, type DrawToolId, type ExportJob, type LayerState, type Layers, type Theme } from "@/lib/types";
@@ -249,7 +249,7 @@ export function StrikeApp() {
             <MapToolbar activeTool={drawTool} onTool={setDrawTool} />
             <LayersPanel open={layersOpen} onOpen={openLayers} layers={layers} setLayer={setLayer} />
             <Legend open={legendOpen} onOpen={openLegend} />
-            <StatusPill layers={layers} onCopyApi={(mode) => copyApi(wellsForApiCopy(d, records, layers), mode)} />
+            <StatusPill layers={layers} />
             <Toast msg={toast} />
           </div>
           <aside id="insightsPanel" className="w-full shrink-0 md:w-auto" style={isMobile ? undefined : { width: PANEL_W }}>
