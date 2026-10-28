@@ -3,6 +3,7 @@
 import * as React from "react";
 import { ChevronLeft, ChevronRight, Maximize2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { useDataset } from "@/lib/dataset-context";
 import { lngLatInPoly } from "@/lib/geo";
 import type { Lease, StrikeDataset, Well } from "@/lib/strike-data";
 import { fmtDate, gapLabel, getWellDetails, type TimelineStep } from "@/lib/well-details";
@@ -148,7 +149,11 @@ export function RecordDetail({
   /** False in the collapsed phone sheet: header and tiles only. */
   showDetail: boolean;
 }) {
-  const det = React.useMemo(() => getWellDetails(well), [well]);
+  const data = useDataset();
+  const det = React.useMemo(
+    () => getWellDetails(well, well.lateralIdx != null ? data.LATERALS[well.lateralIdx] : undefined),
+    [well, data],
+  );
   const [expanded, setExpanded] = React.useState<"chart" | "timeline" | null>(null);
   const isPermit = well.cat === "permit", isRig = well.cat === "rig";
   const lat = det.lateralFt ? n0(det.lateralFt) : "—";

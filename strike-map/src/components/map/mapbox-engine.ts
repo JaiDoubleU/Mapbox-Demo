@@ -25,7 +25,8 @@ function lateralsGeoJSON(d: StrikeDataset): GeoJSON.FeatureCollection {
     type: "FeatureCollection",
     features: d.LATERALS.map((l) => ({
       type: "Feature",
-      properties: { color: l.color },
+      // idx = the owning well, so selection filters work the same as for well dots.
+      properties: { color: l.color, idx: l.wellIdx, layer: d.CATS[d.WELLS[l.wellIdx]?.cat ?? "oil"].layer },
       geometry: { type: "LineString", coordinates: [l.a, l.b] },
     })),
   };
@@ -54,7 +55,7 @@ function gridGeoJSON(d: StrikeDataset): GeoJSON.FeatureCollection {
   };
 }
 
-const LAYER_IDS = ["grid", "laterals", "leases-fill", "leases-sel-fill", "leases-line", "leases-sel", "wells", "wells-sel", "wells-hover"];
+const LAYER_IDS = ["grid", "laterals-sel", "laterals", "leases-fill", "leases-sel-fill", "leases-line", "leases-sel", "wells", "wells-sel", "wells-hover"];
 
 /** Mapbox GL renderer. Mirrors the canvas engine's look and interaction rules. */
 export class MapboxMapEngine implements MapEngine {
@@ -127,6 +128,12 @@ export class MapboxMapEngine implements MapEngine {
     map.addLayer({ id: "grid", type: "line", source: "grid", paint: { "line-color": this.opts.theme === "dark" ? "#ffffff" : "#000000", "line-opacity": 0.06, "line-width": 1 } });
 
     map.addSource("laterals", { type: "geojson", data: lateralsGeoJSON(d) });
+    // Halo under the selected wellbores (white) or the Object Selection hover (pink).
+    map.addLayer({
+      id: "laterals-sel", type: "line", source: "laterals", filter: NONE as mapboxgl.FilterSpecification,
+      layout: { "line-cap": "round" },
+      paint: { "line-color": "#fff", "line-width": 7 },
+    });
     map.addLayer({ id: "laterals", type: "line", source: "laterals", paint: { "line-color": ["get", "color"], "line-width": 2, "line-opacity": 0.85 } });
 
     map.addSource("leases", { type: "geojson", data: leasesGeoJSON(d) });
@@ -181,6 +188,11 @@ export class MapboxMapEngine implements MapEngine {
       1,
     ]);
     map.setLayoutProperty("laterals", "visibility", L.wells === false ? "none" : "visible");
+    map.setLayoutProperty("laterals-sel", "visibility", L.wells === false ? "none" : "visible");
+    map.setFilter(
+      "laterals",
+      (tw.density < 1 ? ["<", ["%", ["get", "idx"], 1000], tw.density * 1000] : null) as mapboxgl.FilterSpecification | null,
+    );
     map.setPaintProperty("laterals", "line-opacity", L.wells === "view" ? 0.65 : 0.85);
     const leaseVis = L.landtracLease === false ? "none" : "visible";
     ["leases-fill", "leases-sel-fill", "leases-line", "leases-sel"].forEach((id) => map.setLayoutProperty(id, "visibility", leaseVis));
@@ -199,7 +211,18 @@ export class MapboxMapEngine implements MapEngine {
     if (!this.ready()) return null;
     const hits = this.map.queryRenderedFeatures(e.point, { layers: ["wells"] });
     const hit = hits.find((f) => isInteractive(this.opts.layers, f.properties?.layer));
-    return hit ? (hit.properties!.idx as number) : null;
+    if (hit) return hit.properties!.idx as number;
+    // Laterals are thin, so accept clicks within 5px of the line.
+    const { x, y } = e.point;
+    const lines = this.map.queryRenderedFeatures(
+      [
+        [x - 5, y - 5],
+        [x + 5, y + 5],
+      ],
+      { layers: ["laterals"] },
+    );
+    const line = lines.find((f) => isInteractive(this.opts.layers, f.properties?.layer));
+    return line ? (line.properties!.idx as number) : null;
   }
 
   private onClick(e: MapMouseEvent) {
@@ -230,6 +253,7 @@ export class MapboxMapEngine implements MapEngine {
       "wells-hover",
       (show ? ["all", this.layerFilter(), ["==", ["get", "idx"], this.hoverIdx]] : NONE) as mapboxgl.FilterSpecification,
     );
+    this.applyLateralHighlight();
   }
 
   project(lng: number, lat: number): Pt {
@@ -253,7 +277,20 @@ export class MapboxMapEngine implements MapEngine {
     this.selected = idxs;
     if (this.ready()) {
       this.map.setFilter("wells-sel", ["all", this.layerFilter(), idxIn(idxs)] as mapboxgl.FilterSpecification);
+      this.applyLateralHighlight();
     }
+  }
+
+  /** Selected wellbores get a white halo and a thicker line; the Object Selection hover a pink halo. */
+  private applyLateralHighlight() {
+    if (!this.ready()) return;
+    const sel = ["literal", this.selected];
+    const hover = this.opts.drawTool === "object-select" ? this.hoverIdx : null;
+    const shown: unknown[] = ["any", ["in", ["get", "idx"], sel]];
+    if (hover != null) shown.push(["==", ["get", "idx"], hover]);
+    this.map.setFilter("laterals-sel", shown as mapboxgl.FilterSpecification);
+    this.map.setPaintProperty("laterals-sel", "line-color", ["case", ["in", ["get", "idx"], sel], "#ffffff", HOVER_PINK]);
+    this.map.setPaintProperty("laterals", "line-width", ["case", ["in", ["get", "idx"], sel], 3.5, 2]);
   }
 
   setSelectedLeases(idxs: number[]) {

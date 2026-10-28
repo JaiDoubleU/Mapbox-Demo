@@ -27,3 +27,18 @@ export function lngLatInPoly(lng: number, lat: number, coords: [number, number][
 export function dist(a: Pt, b: Pt): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
+
+/** Distance from p to the segment a–b, in the same units as the points. */
+export function distToSegment(p: Pt, a: Pt, b: Pt): number {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2)) : 0;
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+/** Approximate length in feet of a short lng/lat segment (flat-earth, fine at lease scale). */
+export function segmentFeet(a: [number, number], b: [number, number]): number {
+  const FT_PER_DEG = 364_000;
+  const dx = (b[0] - a[0]) * Math.cos((((a[1] + b[1]) / 2) * Math.PI) / 180);
+  return Math.hypot(dx, b[1] - a[1]) * FT_PER_DEG;
+}

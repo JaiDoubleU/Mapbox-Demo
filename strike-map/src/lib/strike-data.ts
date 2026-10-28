@@ -17,6 +17,8 @@ export interface WellFile {
 
 export interface Well {
   idx: number;
+  /** Index into LATERALS when the well's horizontal wellbore is mapped. */
+  lateralIdx: number | null;
   api: string;
   name: string;
   operator: string;
@@ -42,8 +44,12 @@ export interface Well {
 
 export interface Lateral {
   color: string;
+  /** Surface location (heel) — the well's own map position. */
   a: [number, number];
+  /** Toe of the lateral. */
   b: [number, number];
+  /** Horizontal well this wellbore belongs to. */
+  wellIdx: number;
 }
 
 export interface SurveyLabel {
@@ -242,6 +248,7 @@ export function generateStrikeDataset(): StrikeDataset {
     const be = cat === "pa" || cat === "dry" || rnd() < 0.25 ? null : rint(28, 64);
     WELLS.push({
       idx: i,
+      lateralIdx: null,
       api: apiNumber(),
       name: leaseName().toUpperCase(),
       operator: pick(OPERATORS),
@@ -278,6 +285,7 @@ export function generateStrikeDataset(): StrikeDataset {
       color: pick(LAT_COLORS),
       a: [lng, lat],
       b: [lng + Math.cos(ang) * len, lat + Math.sin(ang) * len],
+      wellIdx: -1,
     });
   }
 
@@ -354,6 +362,31 @@ export function generateStrikeDataset(): StrikeDataset {
     orientation: "Vertical", oilEUR: 16, be: null, tvd: 3508,
     lng: CENTER.lng + 0.02, lat: CENTER.lat + 0.01,
   } satisfies Partial<Well>);
+
+  // Each lateral is the wellbore of the nearest unclaimed horizontal well: move its heel onto
+  // that well's surface location so clicking the line selects the well. Uses no randomness,
+  // so the rest of the dataset is unchanged.
+  const WELL_TYPES = new Set<CategoryKey>(["oil", "gas", "oilgas", "injection", "dry", "pa"]);
+  const candidates = WELLS.filter((w) => w.orientation === "Horizontal" && WELL_TYPES.has(w.cat));
+  const claimed = new Set<number>();
+  LATERALS.forEach((l, li) => {
+    let best: Well | null = null, bestD = Infinity;
+    for (const w of candidates) {
+      if (claimed.has(w.idx)) continue;
+      const dd = (w.lng - l.a[0]) ** 2 + (w.lat - l.a[1]) ** 2;
+      if (dd < bestD) {
+        bestD = dd;
+        best = w;
+      }
+    }
+    if (!best) return;
+    claimed.add(best.idx);
+    const dx = l.b[0] - l.a[0], dy = l.b[1] - l.a[1];
+    l.a = [best.lng, best.lat];
+    l.b = [best.lng + dx, best.lat + dy];
+    l.wellIdx = best.idx;
+    best.lateralIdx = li;
+  });
 
   const counts = { rigs: 0, permits: 0, wells: 0 };
   WELLS.forEach((w) => {

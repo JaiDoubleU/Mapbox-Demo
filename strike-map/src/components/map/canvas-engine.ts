@@ -1,5 +1,5 @@
 import { BASEMAP_IMAGES } from "@/lib/basemap-images";
-import { pointInPoly, type Pt } from "@/lib/geo";
+import { distToSegment, pointInPoly, type Pt } from "@/lib/geo";
 import type { Lease, Well } from "@/lib/strike-data";
 import {
   CANVAS_PALETTES,
@@ -189,6 +189,19 @@ export class CanvasMapEngine implements MapEngine {
         best = w;
       }
     }
+    if (best) return best;
+    // No dot under the pointer: try the horizontal wellbores (laterals) within 5px.
+    const pt = { x, y };
+    let lineD = 5;
+    for (const l of d.LATERALS) {
+      const w = d.WELLS[l.wellIdx];
+      if (!w || !isInteractive(layers, d.CATS[w.cat].layer) || !passesDensity(w.idx, tweaks.density)) continue;
+      const dd = distToSegment(pt, this.project(l.a[0], l.a[1]), this.project(l.b[0], l.b[1]));
+      if (dd < lineD) {
+        lineD = dd;
+        best = w;
+      }
+    }
     return best;
   }
 
@@ -315,9 +328,27 @@ export class CanvasMapEngine implements MapEngine {
     if (layers.wells !== false) {
       ctx.lineWidth = 2.2;
       ctx.globalAlpha = layers.wells === "view" ? 0.65 * 0.9 : 0.9;
+      const sel = new Set(this.selected);
+      const hoverLine = this.opts.drawTool === "object-select" ? this.hoverIdx : null;
       d.LATERALS.forEach((l) => {
+        if (!passesDensity(l.wellIdx, tw.density)) return;
         const a = this.project(l.a[0], l.a[1]), b = this.project(l.b[0], l.b[1]);
+        const picked = sel.has(l.wellIdx), hovered = hoverLine === l.wellIdx;
+        if (picked || hovered) {
+          // Selected (or Object Selection hover) wellbore: halo under a thicker line.
+          ctx.save();
+          ctx.globalAlpha = 1;
+          ctx.lineCap = "round";
+          ctx.lineWidth = 7;
+          ctx.strokeStyle = hovered && !picked ? HOVER_PINK : "#fff";
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+          ctx.restore();
+        }
         ctx.strokeStyle = l.color;
+        ctx.lineWidth = picked ? 3.5 : 2.2;
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);

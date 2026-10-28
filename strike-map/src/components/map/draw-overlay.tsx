@@ -3,7 +3,7 @@
 import * as React from "react";
 import { dist, type Pt } from "@/lib/geo";
 import { useDataset } from "@/lib/dataset-context";
-import { hitShape, selectableWells, type SelectionShape } from "@/lib/selection";
+import { selectableWells, wellInShape, type SelectionShape } from "@/lib/selection";
 import type { DrawToolId, Layers } from "@/lib/types";
 import type { MapEngine } from "./engine";
 
@@ -79,8 +79,9 @@ export function DrawOverlay({ tool, engine, layers, density, additive, onSelectM
 
   const runSel = (shape: SelectionShape) => {
     if (!engine) return;
+    const project = (lng: number, lat: number) => engine.project(lng, lat);
     const idxs = selectable
-      .filter((w) => hitShape(engine.project(w.lng, w.lat), shape))
+      .filter((w) => wellInShape(data, w, project, shape))
       .map((w) => w.idx);
     onSelectMulti(idxs, additive);
   };

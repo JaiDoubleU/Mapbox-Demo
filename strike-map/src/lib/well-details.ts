@@ -1,4 +1,5 @@
-import type { Well } from "./strike-data";
+import { segmentFeet } from "./geo";
+import type { Lateral, Well } from "./strike-data";
 
 /**
  * Detail-panel data for one record: timeline, monthly production and completion figures.
@@ -61,12 +62,14 @@ export function wellKind(w: Well): string {
   return `${base} (${w.orientation})`;
 }
 
-export function getWellDetails(w: Well, today = new Date()): WellDetails {
+/** `lateral` is the well's mapped wellbore, if any; its length becomes the lateral length. */
+export function getWellDetails(w: Well, lateral?: Lateral, today = new Date()): WellDetails {
   const rnd = mulberry32(w.idx * 7919 + 17);
   const rint = (a: number, b: number) => a + Math.floor(rnd() * (b - a + 1));
   const rflt = (a: number, b: number) => a + rnd() * (b - a);
   const horizontal = w.orientation === "Horizontal";
-  const lateralFt = horizontal ? rint(42, 125) * 100 + rint(0, 99) : null;
+  const randomLateral = horizontal ? rint(42, 125) * 100 + rint(0, 99) : null; // keeps the random sequence stable
+  const lateralFt = lateral ? Math.round(segmentFeet(lateral.a, lateral.b)) : randomLateral;
 
   // ---- timeline -----------------------------------------------------------------
   const [y, m] = w.spud.split("-").map(Number);
