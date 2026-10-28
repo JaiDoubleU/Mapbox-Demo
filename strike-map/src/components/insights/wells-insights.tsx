@@ -42,24 +42,30 @@ const fmtNum = (v: number, digits = 0) => v.toLocaleString("en-US", { minimumFra
 // ---- small controls -----------------------------------------------------------------
 
 /** Oil / Gas text tabs above a chart. */
+/** Oil / Gas Production as a single-select toggle group (the active one stays on when pressed again). */
 function StreamTabs({ value, onChange }: { value: Stream; onChange: (s: Stream) => void }) {
   return (
-    <div role="tablist" aria-label="Stream" className="mb-2 flex gap-3">
+    <ToggleGroup
+      type="single"
+      variant="outline"
+      size="sm"
+      value={value}
+      onValueChange={(v) => v && onChange(v as Stream)}
+      aria-label="Stream"
+      className="mb-2 w-full"
+    >
       {(["oil", "gas"] as Stream[]).map((s) => (
-        <button
-          key={s}
-          role="tab"
-          aria-selected={value === s}
-          onClick={() => onChange(s)}
-          className={cn(
-            "cursor-pointer border-none bg-transparent p-0 text-xs font-semibold uppercase outline-none focus-visible:underline",
-            value === s ? "text-s-text" : "text-s-faint hover:text-s-muted",
-          )}
-        >
-          {STREAM[s].label} - {STREAM[s].rate}
-        </button>
+        <Tooltip key={s}>
+          <TooltipTrigger asChild>
+            {/* The tooltip trigger overwrites data-state, so the pressed style keys off aria-checked. */}
+            <ToggleGroupItem value={s} className="h-7 px-2 text-xs aria-checked:bg-accent aria-checked:text-accent-foreground">
+              {STREAM[s].label}
+            </ToggleGroupItem>
+          </TooltipTrigger>
+          <TooltipContent side="top">Measured in {STREAM[s].rate}</TooltipContent>
+        </Tooltip>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }
 
