@@ -49,7 +49,7 @@ function HeaderCard({ eyebrow: kind, title, lines, onClose }: { eyebrow: string;
   );
 }
 
-/** Well views. The active one is shown selected (green text, accent bar, tint). */
+/** Well views as a horizontal tab strip; scrolls sideways when the tabs don't fit. The active tab is kept in view. */
 export function ActionLinks({
   links,
   active,
@@ -61,8 +61,32 @@ export function ActionLinks({
   onAction: (label: string) => void;
   label?: string;
 }) {
+  const listRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const el = listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    const list = listRef.current;
+    if (!el || !list) return;
+    const l = el.offsetLeft - list.offsetLeft;
+    if (l < list.scrollLeft || l + el.offsetWidth > list.scrollLeft + list.clientWidth)
+      list.scrollTo({ left: l - 12, behavior: "smooth" });
+  }, [active]);
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    e.preventDefault();
+    const i = links.indexOf(active);
+    const next = links[(i + (e.key === "ArrowRight" ? 1 : -1) + links.length) % links.length];
+    onAction(next);
+    requestAnimationFrame(() => listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus());
+  };
   return (
-    <div className={cn(card, "py-1.5")} role="tablist" aria-orientation="vertical" aria-label={label}>
+    <div
+      ref={listRef}
+      role="tablist"
+      aria-orientation="horizontal"
+      aria-label={label}
+      onKeyDown={onKey}
+      className="flex overflow-x-auto overscroll-x-contain rounded-xl border border-border bg-card px-1.5 [scrollbar-width:thin]"
+    >
       {links.map((l) => {
         const on = l === active;
         return (
@@ -70,12 +94,11 @@ export function ActionLinks({
             key={l}
             role="tab"
             aria-selected={on}
+            tabIndex={on ? 0 : -1}
             onClick={() => onAction(l)}
             className={cn(
-              "block w-full cursor-pointer border-y-0 border-r-0 border-l-[3px] border-solid bg-transparent px-3 py-1.5 text-left text-[13px] outline-none hover:text-primary focus-visible:text-primary",
-              on
-                ? "border-primary bg-[color-mix(in_srgb,var(--primary)_10%,transparent)] font-medium text-primary"
-                : "border-transparent text-s-text hover:bg-[color-mix(in_srgb,var(--primary)_6%,transparent)]",
+              "-mb-px shrink-0 cursor-pointer border-x-0 border-t-0 border-b-2 border-solid bg-transparent px-3 py-2.5 text-[13px] whitespace-nowrap outline-none hover:text-primary focus-visible:text-primary",
+              on ? "border-primary font-medium text-primary" : "border-transparent text-s-muted",
             )}
           >
             {l}
