@@ -159,7 +159,7 @@ export function ProductionChart({
 
   return (
     <div ref={wrapRef} className="relative">
-      <div className="mb-1.5 flex items-center justify-between gap-2">
+      <div className="mb-1.5 flex items-center justify-end gap-2">
         <ScaleToggle value={scale} onChange={setScale} />
         <ZoomControls
           active={zoomMode}
