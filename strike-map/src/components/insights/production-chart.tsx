@@ -160,7 +160,6 @@ export function ProductionChart({
   return (
     <div ref={wrapRef} className="relative">
       <div className="mb-1.5 flex items-center justify-end gap-2">
-        <ScaleToggle value={scale} onChange={setScale} />
         <ZoomControls
           active={zoomMode}
           zoomed={domain != null}
@@ -170,6 +169,7 @@ export function ProductionChart({
           }}
           onReset={resetZoom}
         />
+        <ScaleToggle value={scale} onChange={setScale} />
       </div>
       <svg
         width={width}
