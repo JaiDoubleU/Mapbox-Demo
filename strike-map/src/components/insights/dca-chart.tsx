@@ -117,6 +117,12 @@ export function DcaChart({
     .sort((a, b) => a.y - b.y);
   for (let i = 1; i < ends.length; i++) ends[i].y = Math.max(ends[i].y, ends[i - 1].y + 11);
 
+  // Today, as a fractional month on the calendar axis (not drawn on the years-on-production axis).
+  const now = new Date();
+  const nowM = monthKey(now) + (now.getDate() - 1) / new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const showNow = !elapsed && nowM >= m0 && nowM <= m1;
+  const nx = x(nowM);
+
   const lookup = (pts: { month: Date; v: number }[], m: number) => pts.find((p) => monthKey(p.month) === m)?.v;
   const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -186,6 +192,14 @@ export function DcaChart({
           <text x={M.left + iw / 2} y={height - 3} textAnchor="middle" fontSize={10} fill="var(--s-muted)">
             Years on production
           </text>
+        )}
+        {showNow && (
+          <g pointerEvents="none">
+            <line x1={nx} x2={nx} y1={M.top} y2={M.top + ih} stroke="var(--s-muted)" strokeWidth={1} strokeDasharray="3 3" />
+            <text x={nx + (nx > M.left + iw - 40 ? -4 : 4)} y={M.top + 9} textAnchor={nx > M.left + iw - 40 ? "end" : "start"} fontSize={10} fill="var(--s-muted)">
+              Today
+            </text>
+          </g>
         )}
         {plotted.map(({ s, yy }) => (
           <g key={s.key}>
