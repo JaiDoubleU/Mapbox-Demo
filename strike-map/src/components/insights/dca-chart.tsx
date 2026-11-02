@@ -63,6 +63,7 @@ export function DcaChart({
   const wrapRef = React.useRef<HTMLDivElement>(null);
   const [width, setWidth] = React.useState(320);
   const [hoverM, setHoverM] = React.useState<number | null>(null);
+  const clipId = React.useId();
   React.useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -89,7 +90,13 @@ export function DcaChart({
     return vals.length ? logAxis(vals) : null;
   });
   const m0 = Math.min(...all.map((p) => monthKey(p.month)));
-  const m1 = Math.max(...all.map((p) => monthKey(p.month)));
+  const dataM1 = Math.max(...all.map((p) => monthKey(p.month)));
+  // Today, as a fractional month on the calendar axis (not drawn on the years-on-production axis).
+  const now = new Date();
+  const nowM = monthKey(now) + (now.getDate() - 1) / new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const showNow = !elapsed && nowM >= m0 && nowM <= dataM1;
+  // By default today sits 2/3 of the way across and the rest of the forecast runs off the right edge.
+  const m1 = showNow ? m0 + (nowM - m0) * 1.5 : dataM1;
   const x = (m: number) => M.left + ((m - m0) / Math.max(1, m1 - m0)) * iw;
   const scaleY = (a: { lo: number; hi: number }) => (v: number) =>
     M.top + ih - ((Math.log10(Math.max(v, a.lo)) - Math.log10(a.lo)) / (Math.log10(a.hi) - Math.log10(a.lo))) * ih;
@@ -110,17 +117,14 @@ export function DcaChart({
   // just inside the plot so they don't collide with its tick labels.
   const ends = plotted
     .map(({ s, yy }) => {
-      const tail = s.forecast.length ? s.forecast[s.forecast.length - 1] : s.actual[s.actual.length - 1];
+      const visible = (pts: { month: Date; v: number }[]) => pts.filter((p) => monthKey(p.month) <= m1);
+      const tail = visible(s.forecast).at(-1) ?? visible(s.fit).at(-1) ?? visible(s.actual).at(-1);
       return tail ? { key: s.key, label: s.label, x: x(monthKey(tail.month)), y: yy(tail.v) - (nAxes ? 6 : 0) } : null;
     })
     .filter((e): e is NonNullable<typeof e> => !!e)
     .sort((a, b) => a.y - b.y);
   for (let i = 1; i < ends.length; i++) ends[i].y = Math.max(ends[i].y, ends[i - 1].y + 11);
 
-  // Today, as a fractional month on the calendar axis (not drawn on the years-on-production axis).
-  const now = new Date();
-  const nowM = monthKey(now) + (now.getDate() - 1) / new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const showNow = !elapsed && nowM >= m0 && nowM <= m1;
   const nx = x(nowM);
 
   const lookup = (pts: { month: Date; v: number }[], m: number) => pts.find((p) => monthKey(p.month) === m)?.v;
@@ -145,6 +149,11 @@ export function DcaChart({
         onPointerDown={onMove}
         onPointerLeave={() => setHoverM(null)}
       >
+        <defs>
+          <clipPath id={clipId}>
+            <rect x={M.left} y={M.top - 4} width={iw} height={ih + 8} />
+          </clipPath>
+        </defs>
         {/* With only ratios on, the first right axis carries the gridlines and the left axis is hidden. */}
         {!hasPrimary &&
           rights[0]?.ticks.map((v) => (
@@ -201,6 +210,7 @@ export function DcaChart({
             </text>
           </g>
         )}
+        <g clipPath={`url(#${clipId})`}>
         {plotted.map(({ s, yy }) => (
           <g key={s.key}>
             {s.actual.map((p, i) => (
@@ -218,6 +228,7 @@ export function DcaChart({
             )}
           </g>
         ))}
+        </g>
         {ends.map((e) => (
           <text
             key={e.key}
