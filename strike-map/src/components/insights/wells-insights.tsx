@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Switch } from "@/components/ui/switch";
+import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -321,10 +322,10 @@ function DeclineToggleItem({ item, on }: { item: (typeof DECLINE_ITEMS)[number];
     <Tooltip>
       <TooltipTrigger asChild>
         {/* The tooltip trigger overwrites data-state, so the pressed style keys off aria-pressed. */}
-        <ToggleGroupItem value={item.key} className="h-7 gap-1.5 px-2 text-xs aria-pressed:bg-accent aria-pressed:text-accent-foreground">
+        <ToggleGroupItem value={item.key} className="h-7 gap-1.5 px-2 text-xs aria-checked:bg-accent aria-checked:text-accent-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground">
           {/* The series colour: filled when on, a ring when off. */}
           <span
-            className="inline-block size-2 rounded-full border-2 border-solid"
+            className="inline-block size-2 shrink-0 rounded-full border-2 border-solid"
             style={{ borderColor: item.color, background: on ? item.color : "transparent" }}
           />
           {item.label}
@@ -351,6 +352,7 @@ function DeclineView({
   const d = useDataset();
   // Oil, gas and water each toggle on their own; GOR and WOR each add a log axis on the right.
   const [on, setOn] = React.useState<DeclineToggle[]>(["oil", "gas", "water"]);
+  const [showForecast, setShowForecast] = React.useState(true);
   const [years, setYears] = React.useState(30);
   const [limits, setLimits] = React.useState<Record<(typeof RATE_KEYS)[number], number>>({ ...DECLINE_LIMIT });
   const fits = React.useMemo(
@@ -402,22 +404,40 @@ function DeclineView({
     }
     return out;
   }, [fits]);
-  const rates = RATE_KEYS.filter((k) => on.includes(k)).flatMap((k) => (series[k] ? [series[k]!] : []));
-  const ratios = (["gor", "wor"] as const).filter((k) => on.includes(k)).flatMap((k) => (series[k] ? [series[k]!] : []));
+  const noForecast = (s: DcaSeries): DcaSeries => (showForecast ? s : { ...s, forecast: [] });
+  const rates = RATE_KEYS.filter((k) => on.includes(k)).flatMap((k) => (series[k] ? [noForecast(series[k]!)] : []));
+  const ratios = (["gor", "wor"] as const).filter((k) => on.includes(k)).flatMap((k) => (series[k] ? [noForecast(series[k]!)] : []));
   const params = RATE_KEYS.filter((k) => on.includes(k) && fits[k].dca);
   const any = wellCount > 0 && DECLINE_ITEMS.some((i) => series[i.key]);
   const body = (big: boolean) => (
     <>
+      <div className="mb-2 flex items-center gap-2">
+        <ToggleGroup
+          type="multiple"
+          variant="outline"
+          size="sm"
+          value={on.filter((k) => k === "oil" || k === "gas" || k === "water")}
+          onValueChange={(v) => setOn([...(v as DeclineToggle[]), ...on.filter((k) => k === "gor" || k === "wor")])}
+          aria-label="Series"
+        >
+          {DECLINE_ITEMS.filter((i) => i.key !== "gor" && i.key !== "wor").map((item) => (
+            <DeclineToggleItem key={item.key} item={item} on={on.includes(item.key)} />
+          ))}
+        </ToggleGroup>
+        <Toggle variant="outline" size="sm" pressed={showForecast} onPressedChange={setShowForecast} className="ml-auto h-7 px-2 text-xs">
+          Forecast
+        </Toggle>
+      </div>
       <ToggleGroup
         type="multiple"
         variant="outline"
         size="sm"
-        value={on}
-        onValueChange={(v) => setOn(v as DeclineToggle[])}
-        aria-label="Series"
-        className="mb-2 w-full"
+        value={on.filter((k) => k === "gor" || k === "wor")}
+        onValueChange={(v) => setOn([...on.filter((k) => k === "oil" || k === "gas" || k === "water"), ...(v as DeclineToggle[])])}
+        aria-label="Ratios"
+        className="mb-2"
       >
-        {DECLINE_ITEMS.map((item) => (
+        {DECLINE_ITEMS.filter((i) => i.key === "gor" || i.key === "wor").map((item) => (
           <DeclineToggleItem key={item.key} item={item} on={on.includes(item.key)} />
         ))}
       </ToggleGroup>
@@ -446,12 +466,14 @@ function DeclineView({
               </svg>
               Fit
             </span>
-            <span className="inline-flex items-center gap-1">
-              <svg width="16" height="6" aria-hidden="true">
-                <line x1="0" x2="16" y1="3" y2="3" stroke="currentColor" strokeWidth="2" strokeDasharray="6 4" />
-              </svg>
-              Forecast
-            </span>
+            {showForecast && (
+              <span className="inline-flex items-center gap-1">
+                <svg width="16" height="6" aria-hidden="true">
+                  <line x1="0" x2="16" y1="3" y2="3" stroke="currentColor" strokeWidth="2" strokeDasharray="6 4" />
+                </svg>
+                Forecast
+              </span>
+            )}
           </div>
           {params.length > 0 && (
             <table className="mt-2.5 w-full border-collapse text-xs">

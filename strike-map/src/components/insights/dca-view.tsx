@@ -5,6 +5,7 @@ import { Download, Info, SlidersHorizontal } from "lucide-react";
 import { downloadText, fileSafe } from "@/lib/download";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { dcaCsv, runDca, STREAMS, type ArpsParams, type DcaResult, type Stream } from "@/lib/dca";
@@ -92,9 +93,9 @@ function SeriesItem({ value, on, label, unit, color }: { value: Toggle; on: bool
         <ToggleGroupItem
           value={value}
           aria-label={`${label} (${unit})`}
-          className="h-7 gap-1.5 px-2 text-xs aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+          className="h-7 gap-1.5 px-2 text-xs aria-checked:bg-accent aria-checked:text-accent-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground"
         >
-          <span className="inline-block size-2 rounded-full border-2 border-solid" style={{ borderColor: color, background: on ? color : "transparent" }} />
+          <span className="inline-block size-2 shrink-0 rounded-full border-2 border-solid" style={{ borderColor: color, background: on ? color : "transparent" }} />
           {label}
         </ToggleGroupItem>
       </TooltipTrigger>
@@ -117,6 +118,7 @@ export function DcaForecast({
 }) {
   const { dca, on, setOn } = state;
   const series = React.useMemo(() => (dca ? buildSeries(production, dca) : null), [production, dca]);
+  const [showForecast, setShowForecast] = React.useState(true);
   if (!dca || !series) {
     return (
       <p className="m-0 py-3 text-xs text-s-muted">
@@ -124,29 +126,46 @@ export function DcaForecast({
       </p>
     );
   }
-  // Rates toggle independently; GOR and WOR share the right axis, so turning one on turns the other off.
-  const pressed = (Object.keys(on) as Toggle[]).filter((k) => on[k]);
-  const onSeries = (vals: string[]) => {
-    const next = Object.fromEntries((Object.keys(on) as Toggle[]).map((k) => [k, vals.includes(k)])) as Record<Toggle, boolean>;
-    // Turning one ratio on turns the other off.
-    if (next.gor && !on.gor) next.wor = false;
-    if (next.wor && !on.wor) next.gor = false;
-    setOn(next);
-  };
-  const rates = series.rates.filter((s) => on[s.key as Stream]);
+  // Rates toggle independently; GOR and WOR share the right axis, so only one of them is on at a time.
+  const pressedStreams = STREAMS.filter((k) => on[k]);
+  const pressedRatio = on.gor ? "gor" : on.wor ? "wor" : "";
+  const noForecast = <T extends { forecast: unknown[] }>(s: T): T => (showForecast ? s : { ...s, forecast: [] });
+  const rates = series.rates.filter((s) => on[s.key as Stream]).map(noForecast);
   const ratio = on.gor ? series.gor : on.wor ? series.wor : undefined;
   const nothing = !rates.length && !ratio;
   return (
     <div>
-      <ToggleGroup type="multiple" variant="outline" size="sm" value={pressed} onValueChange={onSeries} aria-label="Series" className="mb-2 w-full">
-        {STREAMS.map((s) => (
-          <SeriesItem key={s} value={s} on={on[s]} label={STREAM_META[s].label} unit={STREAM_META[s].rateUnit} color={STREAM_META[s].color} />
-        ))}
+      <div className="mb-2 flex items-center gap-2">
+        <ToggleGroup
+          type="multiple"
+          variant="outline"
+          size="sm"
+          value={pressedStreams}
+          onValueChange={(vals) => setOn({ ...on, oil: vals.includes("oil"), gas: vals.includes("gas"), water: vals.includes("water") })}
+          aria-label="Series"
+        >
+          {STREAMS.map((s) => (
+            <SeriesItem key={s} value={s} on={on[s]} label={STREAM_META[s].label} unit={STREAM_META[s].rateUnit} color={STREAM_META[s].color} />
+          ))}
+        </ToggleGroup>
+        <Toggle variant="outline" size="sm" pressed={showForecast} onPressedChange={setShowForecast} className="ml-auto h-7 px-2 text-xs">
+          Forecast
+        </Toggle>
+      </div>
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        size="sm"
+        value={pressedRatio}
+        onValueChange={(v) => setOn({ ...on, gor: v === "gor", wor: v === "wor" })}
+        aria-label="Ratios"
+        className="mb-2"
+      >
         {(["gor", "wor"] as Ratio[]).map((r) => (
           <SeriesItem key={r} value={r} on={on[r]} label={RATIO_META[r].label} unit={RATIO_META[r].unit} color={RATIO_META[r].color} />
         ))}
       </ToggleGroup>
-      {!nothing && <DcaChart series={rates} secondaries={ratio ? [ratio] : []} height={height} />}
+      {!nothing && <DcaChart series={rates} secondaries={ratio ? [noForecast(ratio)] : []} height={height} />}
       {nothing && <p className="m-0 py-6 text-center text-xs text-s-muted">Turn on a series to see the forecast.</p>}
       <div className="mt-1.5 flex items-center gap-3 text-xs text-s-muted">
         <span className="inline-flex items-center gap-1">
@@ -162,12 +181,14 @@ export function DcaForecast({
           </svg>
           Fit
         </span>
-        <span className="inline-flex items-center gap-1">
-          <svg width="16" height="6" aria-hidden="true">
-            <line x1="0" x2="16" y1="3" y2="3" stroke="currentColor" strokeWidth="2" strokeDasharray="6 4" />
-          </svg>
-          Forecast
-        </span>
+        {showForecast && (
+          <span className="inline-flex items-center gap-1">
+            <svg width="16" height="6" aria-hidden="true">
+              <line x1="0" x2="16" y1="3" y2="3" stroke="currentColor" strokeWidth="2" strokeDasharray="6 4" />
+            </svg>
+            Forecast
+          </span>
+        )}
         {state.modified && <span className="ml-auto font-medium text-primary">Modified</span>}
       </div>
       <Button variant="outline" className="mt-2.5 w-full" onClick={onModify ?? (() => state.setModifyOpen(true))}>

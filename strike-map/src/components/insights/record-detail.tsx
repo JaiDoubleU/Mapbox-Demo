@@ -349,7 +349,7 @@ export function RecordDetail({
               }
               onMaximize={det.production.length ? () => setExpanded("chart") : undefined}
             >
-              <ProductionChart data={det.production} scale={prodScale} onScaleChange={setProdScale} show={prodShow} />
+              <ProductionChart data={det.production} scale={prodScale} onScaleChange={setProdScale} show={prodShow} onShowChange={setProdShow} />
             </InsightCard>
           )}
           <InsightCard title="Timeline" onMaximize={() => setExpanded("timeline")}>
@@ -385,7 +385,7 @@ export function RecordDetail({
             </div>
           )}
           <div className={cn("overflow-y-auto px-[22px] py-4", expanded === "wellbore" ? "max-h-[86vh]" : "max-h-[75vh]")}>
-            {expanded === "chart" && <ProductionChart data={det.production} height={340} scale={prodScale} onScaleChange={setProdScale} show={prodShow} />}
+            {expanded === "chart" && <ProductionChart data={det.production} height={340} scale={prodScale} onScaleChange={setProdScale} show={prodShow} onShowChange={setProdShow} />}
             {expanded === "timeline" && <Timeline steps={det.timeline} />}
             {expanded === "dca" && dcaState.dca && (
               <>

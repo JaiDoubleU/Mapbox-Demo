@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { ProductionMonth } from "@/lib/well-details";
 import { linearTicks, ScaleToggle, timeTicks, ZoomControls, type YScale } from "./chart-controls";
 
@@ -47,12 +48,14 @@ export function ProductionChart({
   scale: scaleProp,
   onScaleChange,
   show,
+  onShowChange,
 }: {
   data: ProductionMonth[];
   height?: number;
   scale?: YScale;
   onScaleChange?: (s: YScale) => void;
   show?: ProductionShow;
+  onShowChange?: (s: Required<ProductionShow>) => void;
 }) {
   const wrapRef = React.useRef<HTMLDivElement>(null);
   const [width, setWidth] = React.useState(320);
@@ -60,7 +63,10 @@ export function ProductionChart({
   const [scaleLocal, setScaleLocal] = React.useState<YScale>("log");
   const scale = scaleProp ?? scaleLocal;
   const setScale = onScaleChange ?? setScaleLocal;
-  const SERIES = ALL_SERIES.filter((s) => show?.[s.key] !== false);
+  const [showLocal, setShowLocal] = React.useState<Required<ProductionShow>>({ oil: true, gas: true, water: true });
+  const shown: Required<ProductionShow> = { oil: show?.oil ?? showLocal.oil, gas: show?.gas ?? showLocal.gas, water: show?.water ?? showLocal.water };
+  const setShown = onShowChange ?? setShowLocal;
+  const SERIES = ALL_SERIES.filter((s) => shown[s.key]);
   const [zoomMode, setZoomMode] = React.useState(false);
   /** Visible time window (ms); null shows the full history. */
   const [domain, setDomain] = React.useState<[number, number] | null>(null);
@@ -159,17 +165,38 @@ export function ProductionChart({
 
   return (
     <div ref={wrapRef} className="relative">
-      <div className="mb-1.5 flex items-center justify-end gap-2">
-        <ZoomControls
-          active={zoomMode}
-          zoomed={domain != null}
-          onToggle={() => {
-            setZoomMode((z) => !z);
-            setDrag(null);
-          }}
-          onReset={resetZoom}
-        />
-        <ScaleToggle value={scale} onChange={setScale} />
+      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+        <ToggleGroup
+          type="multiple"
+          variant="outline"
+          size="sm"
+          aria-label="Series"
+          value={ALL_SERIES.filter((sr) => shown[sr.key]).map((sr) => sr.key)}
+          onValueChange={(v) => setShown({ oil: v.includes("oil"), gas: v.includes("gas"), water: v.includes("water") })}
+        >
+          {ALL_SERIES.map((sr) => (
+            <ToggleGroupItem key={sr.key} value={sr.key} className="h-6 gap-1.5 px-2 text-xs">
+              {/* Same colour as the line and legend: filled when on, a ring when off. */}
+              <span
+                className="inline-block size-2 shrink-0 rounded-full border-2 border-solid"
+                style={{ borderColor: sr.color, background: shown[sr.key] ? sr.color : "transparent" }}
+              />
+              {sr.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        <div className="ml-auto flex items-center gap-2">
+          <ZoomControls
+            active={zoomMode}
+            zoomed={domain != null}
+            onToggle={() => {
+              setZoomMode((z) => !z);
+              setDrag(null);
+            }}
+            onReset={resetZoom}
+          />
+          <ScaleToggle value={scale} onChange={setScale} />
+        </div>
       </div>
       <svg
         width={width}
