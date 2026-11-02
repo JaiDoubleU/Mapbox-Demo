@@ -2,24 +2,19 @@
 
 import * as React from "react";
 import { ZoomIn, ZoomOut } from "lucide-react";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Toggle } from "@/components/ui/toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export type YScale = "linear" | "log";
 
 
-/** Linear / Semi-log as a single-select shadcn ToggleGroup (pressing the active one keeps it). */
+/** Semi-log as a single shadcn Toggle: pressed = semi-log, unpressed = linear. */
 export function ScaleToggle({ value, onChange }: { value: YScale; onChange: (v: YScale) => void }) {
   return (
-    <ToggleGroup type="single" variant="outline" size="sm" value={value} onValueChange={(v) => v && onChange(v as YScale)} aria-label="Y-axis scale">
-      <ToggleGroupItem value="linear" className="h-6 px-2 text-xs">
-        Linear
-      </ToggleGroupItem>
-      <ToggleGroupItem value="log" className="h-6 px-2 text-xs">
-        Semi-log
-      </ToggleGroupItem>
-    </ToggleGroup>
+    <Toggle variant="outline" size="sm" pressed={value === "log"} onPressedChange={(on) => onChange(on ? "log" : "linear")} aria-label="Semi-log y-axis" className="h-6 px-2 text-xs">
+      Semi-Log
+    </Toggle>
   );
 }
 
