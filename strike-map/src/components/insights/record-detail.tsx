@@ -85,7 +85,7 @@ export function ActionLinks({
       aria-orientation="horizontal"
       aria-label={label}
       onKeyDown={onKey}
-      className="flex overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-xl border border-border bg-card px-1.5 [scrollbar-width:thin]"
+      className="flex overflow-x-auto overflow-y-hidden overscroll-x-contain px-1.5 [scrollbar-width:thin]"
     >
       {links.map((l) => {
         const on = l === active;
