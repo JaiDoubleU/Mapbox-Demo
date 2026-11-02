@@ -93,7 +93,7 @@ function SeriesItem({ value, on, label, unit, color }: { value: Toggle; on: bool
         <ToggleGroupItem
           value={value}
           aria-label={`${label} (${unit})`}
-          className="h-7 gap-1.5 px-2 text-xs aria-checked:bg-accent aria-checked:text-accent-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+          className="h-6 gap-1.5 px-2 text-xs aria-checked:bg-accent aria-checked:text-accent-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground"
         >
           <span className="inline-block size-2 shrink-0 rounded-full border-2 border-solid" style={{ borderColor: color, background: on ? color : "transparent" }} />
           {label}
@@ -148,7 +148,7 @@ export function DcaForecast({
             <SeriesItem key={s} value={s} on={on[s]} label={STREAM_META[s].label} unit={STREAM_META[s].rateUnit} color={STREAM_META[s].color} />
           ))}
         </ToggleGroup>
-        <Toggle variant="outline" size="sm" pressed={showForecast} onPressedChange={setShowForecast} className="ml-auto h-7 px-2 text-xs">
+        <Toggle variant="outline" size="sm" pressed={showForecast} onPressedChange={setShowForecast} className="ml-auto h-6 px-2 text-xs">
           Forecast
         </Toggle>
       </div>

@@ -322,7 +322,7 @@ function DeclineToggleItem({ item, on }: { item: (typeof DECLINE_ITEMS)[number];
     <Tooltip>
       <TooltipTrigger asChild>
         {/* The tooltip trigger overwrites data-state, so the pressed style keys off aria-pressed. */}
-        <ToggleGroupItem value={item.key} className="h-7 gap-1.5 px-2 text-xs aria-checked:bg-accent aria-checked:text-accent-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground">
+        <ToggleGroupItem value={item.key} className="h-6 gap-1.5 px-2 text-xs aria-checked:bg-accent aria-checked:text-accent-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground">
           {/* The series colour: filled when on, a ring when off. */}
           <span
             className="inline-block size-2 shrink-0 rounded-full border-2 border-solid"
@@ -424,7 +424,7 @@ function DeclineView({
             <DeclineToggleItem key={item.key} item={item} on={on.includes(item.key)} />
           ))}
         </ToggleGroup>
-        <Toggle variant="outline" size="sm" pressed={showForecast} onPressedChange={setShowForecast} className="ml-auto h-7 px-2 text-xs">
+        <Toggle variant="outline" size="sm" pressed={showForecast} onPressedChange={setShowForecast} className="ml-auto h-6 px-2 text-xs">
           Forecast
         </Toggle>
       </div>
