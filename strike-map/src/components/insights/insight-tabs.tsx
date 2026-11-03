@@ -1,8 +1,9 @@
 "use client";
 
+import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export type InsightTab = "area" | "wells" | "permits" | "rigs";
 export const NO_STEP: Record<InsightTab, number> = { area: -1, wells: -1, permits: -1, rigs: -1 };
@@ -14,35 +15,42 @@ const TABS: { id: InsightTab; label: string }[] = [
 ];
 
 /**
- * shadcn ToggleGroup (single, outline, small) with a count Badge in each item. A single toggle
- * group lets the active item be pressed again to deselect, so that's ignored to keep one tab on.
+ * shadcn Tabs with a count Badge in each tab. The strip scrolls sideways when the tabs don't fit
+ * (the list is absolutely positioned inside a fixed-height scroller, so there is never a vertical
+ * scrollbar), and the active tab is scrolled into view.
  */
 export function InsightTabs({ value, counts, onChange }: { value: InsightTab; counts: Record<InsightTab, number | null>; onChange: (t: InsightTab) => void }) {
+  const scroller = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const box = scroller.current;
+    const el = box?.querySelector<HTMLElement>('[data-state="active"]');
+    if (!box || !el) return;
+    if (el.offsetLeft < box.scrollLeft || el.offsetLeft + el.offsetWidth > box.scrollLeft + box.clientWidth)
+      box.scrollTo({ left: el.offsetLeft - 16, behavior: "smooth" });
+  }, [value]);
   return (
-    <ToggleGroup
-      type="single"
-      variant="outline"
-      size="sm"
-      value={value}
-      onValueChange={(v) => v && onChange(v as InsightTab)}
-      aria-label="Insights"
-      className="mb-3 w-full"
-    >
-      {TABS.map((t) => {
-        const n = counts[t.id];
-        const on = value === t.id;
-        return (
-          <ToggleGroupItem key={t.id} value={t.id} disabled={n === 0} aria-label={n == null ? t.label : `${t.label} (${n})`} className="h-7 gap-0.5 px-2 text-xs">
-            {t.label}
-            {n != null && (
-              <Badge variant={on ? "default" : "secondary"} className="h-4 rounded-full px-1.5 py-0 text-xs leading-none tabular-nums">
-                {n.toLocaleString("en-US")}
-              </Badge>
-            )}
-          </ToggleGroupItem>
-        );
-      })}
-    </ToggleGroup>
+    <Tabs value={value} onValueChange={(v) => onChange(v as InsightTab)} className="mb-3 gap-0">
+      <div ref={scroller} className="relative h-10 overflow-x-auto overflow-y-hidden rounded-sm bg-muted [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <TabsList aria-label="Insights" className="absolute top-0 left-0 flex h-10 w-full min-w-max flex-row items-center rounded-none bg-transparent p-0">
+          <div className="w-4 shrink-0" aria-hidden />
+          {TABS.map((t) => {
+            const n = counts[t.id];
+            const on = value === t.id;
+            return (
+              <TabsTrigger key={t.id} value={t.id} disabled={n === 0} aria-label={n == null ? t.label : `${t.label} (${n})`} className="h-8 shrink-0 px-4 text-xs">
+                {t.label}
+                {n != null && (
+                  <Badge variant={on ? "default" : "secondary"} className="h-4 rounded-full px-1.5 py-0 text-xs leading-none tabular-nums">
+                    {n.toLocaleString("en-US")}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            );
+          })}
+          <div className="w-4 shrink-0" aria-hidden />
+        </TabsList>
+      </div>
+    </Tabs>
   );
 }
 
